@@ -8,6 +8,7 @@ from bot.database.methods import check_role_cached
 from bot.filters import HasPermissionFilter
 from bot.database.models import Permission
 from bot.database.methods.audit import log_audit
+from bot.handlers.user._helpers import edit_media_msg, edit_msg, ADMIN_PHOTO_PATH, MENU_PHOTO_PATH
 
 router = Router()
 
@@ -27,8 +28,10 @@ async def console_callback_handler(call: CallbackQuery, state: FSMContext):
     if Permission.has_any_admin_perm(role):
         mw = _get_auth_middleware()
         maintenance = mw.maintenance_mode if mw else False
-        await call.message.edit_text(
-            localize("admin.menu.main"),
+        await edit_media_msg(
+            call.message,
+            ADMIN_PHOTO_PATH,
+            caption=localize("admin.menu.main"),
             reply_markup=admin_console_keyboard(maintenance_mode=maintenance, role=role),
         )
     else:
@@ -60,7 +63,9 @@ async def toggle_maintenance_handler(call: CallbackQuery):
         await call.answer(localize("admin.maintenance.disabled"), show_alert=True)
 
     role = await check_role_cached(call.from_user.id)
-    await call.message.edit_text(
+    # Photo is already the admin photo — just update caption + keyboard
+    await edit_msg(
+        call.message,
         localize("admin.menu.main"),
         reply_markup=admin_console_keyboard(maintenance_mode=mw.maintenance_mode, role=role),
     )

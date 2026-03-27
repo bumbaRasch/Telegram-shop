@@ -5,12 +5,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 import datetime
+import os
+
+from bot.handlers.user._helpers import edit_msg, edit_media_msg, get_photo, cache_photo, MENU_PHOTO_PATH
 
 from bot.database.methods import (
     select_max_role_id, create_user, check_role, check_user,
     select_user_operations, select_user_items, check_user_cached
 )
-from bot.database.methods.read import get_cart_count
+from bot.database.methods.read import get_cart_count, get_setting
 from bot.database.methods.lazy_queries import query_user_operations_history
 from bot.handlers.other import check_sub_channel, _parse_channel_username
 from bot.keyboards import main_menu, back, profile_keyboard, check_sub
@@ -48,7 +51,10 @@ async def start(message: Message, state: FSMContext):
         telegram_id=int(user_id),
         registration_date=datetime.datetime.now(datetime.timezone.utc),
         referral_id=int(referral_id) if referral_id else None,
-        role=user_role
+        role=user_role,
+        username=message.from_user.username,
+        first_name=message.from_user.first_name,
+        last_name=message.from_user.last_name,
     )
 
     if is_new_user:
@@ -73,8 +79,15 @@ async def start(message: Message, state: FSMContext):
         # Ignore channel errors (private channel, wrong link, etc.)
         logger.warning(f"Channel subscription check failed for user {user_id}: {e}")
 
-    markup = main_menu(role=role_data, channel=channel_username, helper=EnvKeys.HELPER_ID)
-    await message.answer(localize("menu.title"), reply_markup=markup)
+    layout = await get_setting("menu_layout", "1")
+    markup = main_menu(role=role_data, channel=channel_username, helper=EnvKeys.HELPER_ID, layout=layout)
+    photo = get_photo(MENU_PHOTO_PATH)
+    try:
+        sent = await message.answer_photo(photo, caption=localize("menu.title"), reply_markup=markup)
+        if sent.photo:
+            cache_photo(MENU_PHOTO_PATH, sent.photo[-1].file_id)
+    except Exception:
+        await message.answer(localize("menu.title"), reply_markup=markup)
     await message.delete()
     await state.clear()
 
@@ -91,16 +104,19 @@ async def back_to_menu_callback_handler(call: CallbackQuery, state: FSMContext):
             telegram_id=user_id,
             registration_date=datetime.datetime.now(datetime.timezone.utc),
             referral_id=None,
-            role=1
+            role=1,
+            username=call.from_user.username,
+            first_name=call.from_user.first_name,
+            last_name=call.from_user.last_name,
         )
         user = await check_user_cached(user_id)
 
     role_id = user.get('role_id')
 
     channel_username = _parse_channel_username()
-
-    markup = main_menu(role=role_id, channel=channel_username, helper=EnvKeys.HELPER_ID)
-    await call.message.edit_text(localize("menu.title"), reply_markup=markup)
+    layout = await get_setting("menu_layout", "1")
+    markup = main_menu(role=role_id, channel=channel_username, helper=EnvKeys.HELPER_ID, layout=layout)
+    await edit_media_msg(call.message, MENU_PHOTO_PATH, localize("menu.title"), markup)
     await state.clear()
 
 
@@ -111,7 +127,7 @@ async def rules_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     rules_data = EnvKeys.RULES
     if rules_data:
-        await call.message.edit_text(rules_data, reply_markup=back("back_to_menu"))
+        await edit_msg(call.message, rules_data, back("back_to_menu"))
     else:
         await call.answer(localize("rules.not_set"))
     await state.clear()
@@ -141,11 +157,7 @@ async def profile_callback_handler(call: CallbackQuery, state: FSMContext):
         f"{localize('profile.total_topup', amount=overall_balance, currency=EnvKeys.PAY_CURRENCY)}\n"
         f"{localize('profile.purchased_count', count=items)}"
     )
-    try:
-        await call.message.edit_text(text, reply_markup=markup, parse_mode='HTML')
-    except TelegramBadRequest as e:
-        if "message is not modified" not in str(e):
-            raise
+    await edit_msg(call.message, text, markup, parse_mode='HTML')
     await state.clear()
 
 
@@ -164,8 +176,9 @@ async def check_sub_to_channel(call: CallbackQuery, state: FSMContext):
         if await check_sub_channel(chat_member):
             user = await check_user_cached(user_id)
             role_id = user.get('role_id')
-            markup = main_menu(role_id, channel_username, helper)
-            await call.message.edit_text(localize("menu.title"), reply_markup=markup)
+            layout = await get_setting("menu_layout", "1")
+            markup = main_menu(role_id, channel_username, helper, layout=layout)
+            await edit_media_msg(call.message, MENU_PHOTO_PATH, localize("menu.title"), markup)
             await state.clear()
             return
 
@@ -195,10 +208,7 @@ async def _show_operations_page(call: CallbackQuery, state: FSMContext, user_id:
     total_pages = await paginator.get_total_pages()
 
     if not items:
-        await call.message.edit_text(
-            localize("history.title") + "\n\n" + localize("history.empty"),
-            reply_markup=back("profile"),
-        )
+        await edit_msg(call.message, localize("history.title") + "\n\n" + localize("history.empty"), back("profile"))
         return
 
     lines = [localize("history.title"), ""]
@@ -231,6 +241,6 @@ async def _show_operations_page(call: CallbackQuery, state: FSMContext, user_id:
         kb.row(*nav_buttons)
     kb.row(InlineKeyboardButton(text=localize("btn.back"), callback_data="profile"))
 
-    await call.message.edit_text("\n".join(lines), reply_markup=kb.as_markup())
+    await edit_msg(call.message, "\n".join(lines), kb.as_markup())
 
 
