@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 import asyncio
 from typing import Optional
 
@@ -65,7 +66,7 @@ async def shop_callback_handler(call: CallbackQuery):
     actions.append((localize("btn.back"), "console"))
 
     markup = simple_buttons(actions, per_row=1)
-    await call.message.edit_text(localize("admin.shop.menu.title"), reply_markup=markup)
+    await edit_msg(call.message, localize("admin.shop.menu.title"), reply_markup=markup)
 
 
 @router.callback_query(F.data == "show_logs", HasPermissionFilter(Permission.STATS_VIEW))
@@ -167,7 +168,7 @@ async def statistics_callback_handler(call: CallbackQuery):
             perms_str = ", ".join(perms_list) if perms_list else "—"
             text += f"\n◾<b>{r['name']}</b> ({perms_str}): {r['user_count']}"
 
-    await call.message.edit_text(text, reply_markup=back("shop_management"), parse_mode="HTML")
+    await edit_msg(call.message, text, reply_markup=back("shop_management"), parse_mode="HTML")
 
 
 _PERM_LABELS = {
@@ -201,7 +202,7 @@ async def users_callback_handler(call: CallbackQuery, state: FSMContext):
         nav_cb_prefix="users-page_",
     )
 
-    await call.message.edit_text(localize("admin.shop.users.title"), reply_markup=markup)
+    await edit_msg(call.message, localize("admin.shop.users.title"), reply_markup=markup)
 
     # Save state
     await state.update_data(users_paginator=paginator.get_state())
@@ -233,7 +234,7 @@ async def navigate_users(call: CallbackQuery, state: FSMContext):
         nav_cb_prefix="users-page_",
     )
 
-    await call.message.edit_text(localize("admin.shop.users.title"), reply_markup=markup)
+    await edit_msg(call.message, localize("admin.shop.users.title"), reply_markup=markup)
 
     # Update state
     await state.update_data(users_paginator=paginator.get_state())
@@ -268,7 +269,7 @@ async def show_user_info(call: CallbackQuery):
         f"{localize('profile.registration_date', dt=user.get('registration_date'))}\n"
     )
 
-    await call.message.edit_text(text, parse_mode="HTML", reply_markup=back("users_list"))
+    await edit_msg(call.message, text, parse_mode="HTML", reply_markup=back("users_list"))
 
 
 @router.callback_query(F.data == "show_bought_item", HasPermissionFilter(Permission.CATALOG_MANAGE))
@@ -276,7 +277,7 @@ async def show_bought_item_callback_handler(call: CallbackQuery, state: FSMConte
     """
     Ask for purchased item's unique ID to search.
     """
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.shop.bought.prompt_id"),
         reply_markup=back("shop_management"),
     )

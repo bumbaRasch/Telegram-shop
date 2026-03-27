@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from urllib.parse import urlparse
 
 from aiogram import Router, F
@@ -21,7 +22,7 @@ router = Router()
 @router.callback_query(F.data == 'update_item_amount', HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
 async def update_item_amount_callback_handler(call: CallbackQuery, state):
     """Starts the flow for adding values (stock) to an existing item."""
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.goods.update.amount.prompt.name'),
         reply_markup=back("goods_management")
     )
@@ -122,7 +123,7 @@ async def updating_item_amount(call: CallbackQuery, state):
     if skipped_invalid:
         text_lines.append(localize('admin.goods.add.result.skipped_invalid', n=skipped_invalid))
 
-    await call.message.edit_text("\n".join(text_lines), parse_mode="HTML", reply_markup=back('goods_management'))
+    await edit_msg(call.message, "\n".join(text_lines), parse_mode="HTML", reply_markup=back('goods_management'))
 
     # Optional: channel notification (if configured)
     channel_username = _parse_channel_username()
@@ -154,7 +155,7 @@ async def updating_item_amount(call: CallbackQuery, state):
 @router.callback_query(F.data == 'update_item', HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
 async def update_item_callback_handler(call: CallbackQuery, state):
     """Starts the full update flow."""
-    await call.message.edit_text(localize('admin.goods.update.prompt.name'), reply_markup=back("goods_management"))
+    await edit_msg(call.message, localize('admin.goods.update.prompt.name'), reply_markup=back("goods_management"))
     await state.set_state(UpdateItemFSM.waiting_item_name_for_update)
 
 
@@ -242,7 +243,7 @@ async def update_item_process(call: CallbackQuery, state):
     if decision_yesno == 'no':
         # No type change (keep infinity/regular), update meta only
         await update_item(item_old_name, item_new_name, item_description, price, category)
-        await call.message.edit_text(localize('admin.goods.update.success'), reply_markup=back('goods_management'))
+        await edit_msg(call.message, localize('admin.goods.update.success'), reply_markup=back('goods_management'))
         admin_info = await call.message.bot.get_chat(call.from_user.id)
         await log_audit("update_item", user_id=call.from_user.id, resource_type="Item", resource_id=item_new_name,
                         details=f"admin={admin_info.first_name}, old_name={item_old_name}")
@@ -252,14 +253,14 @@ async def update_item_process(call: CallbackQuery, state):
     # decision_yesno == 'yes'
     if decision_scope == 'make':
         # Switch to infinite mode: expect a single value
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.goods.add.single.prompt_value'),
             reply_markup=back('goods_management')
         )
         await state.set_state(UpdateItemFSM.waiting_single_value)
     else:
         # Switch to regular mode: collect many values
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.goods.add.values.prompt_multi'),
             reply_markup=back("goods_management")
         )
@@ -389,7 +390,7 @@ async def update_item_no_infinity(call: CallbackQuery, state):
         except TelegramBadRequest as e:
             await call.answer(localize("errors.channel.telegram_bad_request", e=e))
 
-    await call.message.edit_text("\n".join(text_lines), parse_mode="HTML", reply_markup=back('goods_management'))
+    await edit_msg(call.message, "\n".join(text_lines), parse_mode="HTML", reply_markup=back('goods_management'))
     admin_info = await call.message.bot.get_chat(call.from_user.id)
     await log_audit("update_item", user_id=call.from_user.id, resource_type="Item", resource_id=item_new_name,
                     details=f"admin={admin_info.first_name}, old_name={item_old_name}")

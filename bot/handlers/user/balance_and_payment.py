@@ -20,6 +20,7 @@ from bot.misc.services.payment import _minor_units_for
 from bot.filters import ValidAmountFilter
 from bot.i18n import localize
 from bot.states import BalanceStates
+from bot.handlers.user._helpers import edit_msg
 
 router = Router()
 
@@ -50,10 +51,7 @@ async def replenish_balance_callback_handler(call: CallbackQuery, state: FSMCont
         await call.answer(localize("payments.not_configured"), show_alert=True)
         return
 
-    await call.message.edit_text(
-        localize("payments.replenish_prompt", currency=EnvKeys.PAY_CURRENCY),
-        reply_markup=back('profile')
-    )
+    await edit_msg(call.message, localize("payments.replenish_prompt", currency=EnvKeys.PAY_CURRENCY), back('profile'))
     await state.set_state(BalanceStates.waiting_amount)
 
 
@@ -111,7 +109,7 @@ async def process_replenish_balance(call: CallbackQuery, state: FSMContext):
 
     if amount is None:
         await call.answer(localize("payments.session_expired"), show_alert=True)
-        await call.message.edit_text(localize("menu.title"), reply_markup=back('back_to_menu'))
+        await edit_msg(call.message, localize("menu.title"), back('back_to_menu'))
         await state.clear()
         return
 
@@ -170,14 +168,11 @@ async def process_replenish_balance(call: CallbackQuery, state: FSMContext):
 
             await state.update_data(invoice_id=invoice_id, payment_type="cryptopay")
 
-            await call.message.edit_text(
-                localize("payments.invoice.summary",
+            await edit_msg(call.message, localize("payments.invoice.summary",
                          amount=int(amount_dec),
                          minutes=int(ttl_seconds / 60),
                          button=localize("btn.check_payment"),
-                         currency=payment_request.currency),
-                reply_markup=payment_menu(pay_url)
-            )
+                         currency=payment_request.currency), payment_menu(pay_url))
 
         elif call.data == "pay_stars":
             if EnvKeys.STARS_PER_VALUE > 0:
@@ -278,12 +273,9 @@ async def checking_payment(call: CallbackQuery, state: FSMContext):
             # Send a notification to the referrer
             await _notify_referrer_bonus(call.bot, user_id, balance_amount, call.from_user.first_name, call.from_user.id)
 
-            await call.message.edit_text(
-                localize("payments.topped_simple",
+            await edit_msg(call.message, localize("payments.topped_simple",
                          amount=balance_amount,
-                         currency=EnvKeys.PAY_CURRENCY),
-                reply_markup=back('profile')
-            )
+                         currency=EnvKeys.PAY_CURRENCY), back('profile'))
             await state.clear()
 
             # Audit log
@@ -472,10 +464,7 @@ async def buy_item_callback_handler(call: CallbackQuery, state: FSMContext):
                 message=message
             )
 
-            await call.message.edit_text(
-                error_text,
-                reply_markup=back('back_to_item')
-            )
+            await edit_msg(call.message, error_text, back('back_to_item'))
 
             if message not in error_messages:
                 await log_audit("purchase_error", level="ERROR", user_id=user_id, resource_type="Item", resource_id=purchase_request.item_name, details=message)
@@ -499,7 +488,8 @@ async def buy_item_callback_handler(call: CallbackQuery, state: FSMContext):
             (localize("btn.back"), "back_to_item"),
         ]
 
-        await call.message.edit_text(
+        await edit_msg(
+            call.message,
             localize(
                 'shop.purchase.receipt',
                 item_name=purchase_data['item_name'],
@@ -511,8 +501,8 @@ async def buy_item_callback_handler(call: CallbackQuery, state: FSMContext):
                 value=safe_value,
                 currency=EnvKeys.PAY_CURRENCY,
             ),
+            simple_buttons(buttons),
             parse_mode='HTML',
-            reply_markup=simple_buttons(buttons),
         )
 
         # Secure logging

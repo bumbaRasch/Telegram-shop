@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
@@ -66,7 +67,7 @@ async def role_management_handler(call: CallbackQuery, state: FSMContext):
     buttons.append((localize('admin.roles.create'), 'role_new'))
     buttons.append((localize('btn.back'), 'console'))
 
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.roles.list_title'),
         reply_markup=simple_buttons(buttons, per_row=1)
     )
@@ -101,14 +102,14 @@ async def role_view_handler(call: CallbackQuery):
         actions.append((localize('admin.roles.delete'), f"role_d_{role_id}"))
     actions.append((localize('btn.back'), 'role_mgmt'))
 
-    await call.message.edit_text(text, parse_mode='HTML', reply_markup=simple_buttons(actions, per_row=1))
+    await edit_msg(call.message, text, parse_mode='HTML', reply_markup=simple_buttons(actions, per_row=1))
 
 
 # Create role flow
 
 @router.callback_query(F.data == 'role_new', HasPermissionFilter(Permission.ADMINS_MANAGE))
 async def role_create_start(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.roles.prompt_name'),
         reply_markup=back('role_mgmt')
     )
@@ -155,7 +156,7 @@ async def role_edit_start(call: CallbackQuery, state: FSMContext):
         caller_perms=caller_perms,
         mode='edit'
     )
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.roles.edit_name_prompt'),
         reply_markup=back(f'role_v_{role_id}')
     )
@@ -249,7 +250,7 @@ async def _perms_done(call: CallbackQuery, state: FSMContext):
     if mode == 'create':
         role_id = await create_role(name, perms)
         if role_id is None:
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 localize('admin.roles.name_exists'),
                 reply_markup=back('role_mgmt')
             )
@@ -257,7 +258,7 @@ async def _perms_done(call: CallbackQuery, state: FSMContext):
             await log_audit("create_role", user_id=call.from_user.id,
                       resource_type="Role", resource_id=str(role_id),
                       details=f"name={name}, perms={perms}")
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 localize('admin.roles.created', name=name),
                 reply_markup=back('role_mgmt')
             )
@@ -268,12 +269,12 @@ async def _perms_done(call: CallbackQuery, state: FSMContext):
             await log_audit("update_role", user_id=call.from_user.id,
                       resource_type="Role", resource_id=str(role_id),
                       details=f"name={name}, perms={perms}")
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 localize('admin.roles.updated', name=name),
                 reply_markup=back('role_mgmt')
             )
         else:
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 localize('admin.roles.name_exists') if 'already exists' in (err or '') else str(err),
                 reply_markup=back('role_mgmt')
             )
@@ -300,7 +301,7 @@ async def role_delete_prompt(call: CallbackQuery):
         (localize('btn.yes'), f"role_dc_{role_id}"),
         (localize('btn.no'), f"role_v_{role_id}"),
     ]
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.roles.delete_confirm', name=role['name']),
         reply_markup=simple_buttons(buttons, per_row=2)
     )
@@ -326,12 +327,12 @@ async def role_delete_confirm(call: CallbackQuery):
         await log_audit("delete_role", user_id=call.from_user.id,
                   resource_type="Role", resource_id=str(role_id),
                   details=f"name={role['name']}")
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.roles.deleted'),
             reply_markup=back('role_mgmt')
         )
     else:
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.roles.delete_fail', error=err),
             reply_markup=back('role_mgmt')
         )
@@ -366,7 +367,7 @@ async def assign_role_list(call: CallbackQuery):
         buttons.append((f"{role['name']}{current}", f"asr_{role['id']}_{target_id}"))
     buttons.append((localize('btn.back'), f"check-user_{target_id}"))
 
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.roles.assign_prompt', id=target_id),
         reply_markup=simple_buttons(buttons, per_row=1)
     )
@@ -407,7 +408,7 @@ async def assign_role_confirm(call: CallbackQuery):
         auth_middleware.invalidate_admin_cache(target_id)
 
     user_info = await call.message.bot.get_chat(target_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.roles.assigned', name=user_info.first_name, role=role['name']),
         reply_markup=back(f'check-user_{target_id}')
     )

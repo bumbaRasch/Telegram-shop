@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from functools import partial
 
 from aiogram import Router, F
@@ -32,7 +33,7 @@ async def goods_management_callback_handler(call: CallbackQuery, state):
         (localize("btn.back"), "console"),
     ]
     markup = simple_buttons(actions, per_row=1)
-    await call.message.edit_text(localize('admin.goods.menu.title'), reply_markup=markup)
+    await edit_msg(call.message, localize('admin.goods.menu.title'), reply_markup=markup)
     await state.clear()
 
 
@@ -41,7 +42,7 @@ async def delete_item_callback_handler(call: CallbackQuery, state):
     """
     Requests a position name to delete.
     """
-    await call.message.edit_text(localize('admin.goods.delete.prompt.name'), reply_markup=back("goods_management"))
+    await edit_msg(call.message, localize('admin.goods.delete.prompt.name'), reply_markup=back("goods_management"))
     await state.set_state(GoodsFSM.waiting_item_name_delete)
 
 
@@ -73,7 +74,7 @@ async def show_items_callback_handler(call: CallbackQuery, state):
     """
     Requests a position name to show its items.
     """
-    await call.message.edit_text(localize('admin.goods.prompt.enter_item_name'), reply_markup=back("goods_management"))
+    await edit_msg(call.message, localize('admin.goods.prompt.enter_item_name'), reply_markup=back("goods_management"))
     await state.set_state(GoodsFSM.waiting_item_name_show)
 
 
@@ -166,7 +167,7 @@ async def navigate_items_in_goods(call: CallbackQuery, state: FSMContext):
     # Check if there are any items
     total = await paginator.get_total_count()
     if total == 0:
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.goods.list_in_position.empty'),
             reply_markup=back('goods_management')
         )
@@ -181,7 +182,7 @@ async def navigate_items_in_goods(call: CallbackQuery, state: FSMContext):
         nav_cb_prefix=f"gip_{item_hash}_"
     )
 
-    await call.message.edit_text(localize('admin.goods.list_in_position.title'), reply_markup=markup)
+    await edit_msg(call.message, localize('admin.goods.list_in_position.title'), reply_markup=markup)
 
     # Update state
     await state.update_data(
@@ -243,7 +244,7 @@ async def item_info_callback_handler(call: CallbackQuery, state: FSMContext):
         f'{localize("admin.goods.item.info.value", value=item_info["value"])}'
     )
 
-    await call.message.edit_text(text, parse_mode='HTML', reply_markup=markup)
+    await edit_msg(call.message, text, parse_mode='HTML', reply_markup=markup)
 
 
 @router.callback_query(
@@ -271,7 +272,7 @@ async def process_delete_item_from_position(call: CallbackQuery, state: FSMConte
     item_info = await get_goods_info(item_id)
     if not item_info:
         await call.answer(localize("admin.goods.item.already_deleted_or_missing"), show_alert=True)
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize("admin.goods.list_in_position.title"),
             reply_markup=back(f"gip_{item_hash}_{page}")
         )
@@ -285,7 +286,7 @@ async def process_delete_item_from_position(call: CallbackQuery, state: FSMConte
         try:
             page_int = int(page)
         except Exception:
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 localize('admin.goods.item.deleted'),
                 reply_markup=back(f"gip_{item_hash}_{page}")
             )
@@ -308,7 +309,7 @@ async def process_delete_item_from_position(call: CallbackQuery, state: FSMConte
         # Check if there are any items left
         total = await paginator.get_total_count()
         if total == 0:
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 localize('admin.goods.list_in_position.empty'),
                 reply_markup=back("goods_management")
             )
@@ -326,7 +327,7 @@ async def process_delete_item_from_position(call: CallbackQuery, state: FSMConte
                 nav_cb_prefix=f"gip_{item_hash}_"
             )
 
-            await call.message.edit_text(
+            await edit_msg(call.message, 
                 f'{localize("admin.goods.item.deleted")}\n\n{localize("admin.goods.list_in_position.title")}',
                 reply_markup=markup
             )
@@ -337,7 +338,7 @@ async def process_delete_item_from_position(call: CallbackQuery, state: FSMConte
                 item_hash_mapping={item_hash: item_name}
             )
     else:
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.goods.item.deleted'),
             reply_markup=back("goods_management")
         )

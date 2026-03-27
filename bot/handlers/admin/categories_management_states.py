@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 
@@ -24,7 +25,7 @@ async def categories_callback_handler(call: CallbackQuery):
         (localize("admin.categories.delete"), "delete_category"),
         (localize("btn.back"), "console"),
     ]
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.categories.menu.title"),
         reply_markup=simple_buttons(actions, per_row=1),
     )
@@ -35,7 +36,7 @@ async def add_category_callback_handler(call: CallbackQuery, state):
     """
     Asks admin for a new category name.
     """
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.categories.prompt.add"),
         reply_markup=back("categories_management"),
     )
@@ -80,7 +81,7 @@ async def delete_category_callback_handler(call: CallbackQuery, state):
     """
     Asks admin for a category name to delete.
     """
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.categories.prompt.delete"),
         reply_markup=back("categories_management"),
     )
@@ -117,7 +118,7 @@ async def update_category_callback_handler(call: CallbackQuery, state):
     """
     Asks admin for current category name before renaming.
     """
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.categories.prompt.rename.old"),
         reply_markup=back("categories_management"),
     )

@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from datetime import datetime
 from typing import Optional
 
@@ -25,7 +26,7 @@ broadcast_manager: Optional[BroadcastManager] = None
 @router.callback_query(F.data == "send_message", HasPermissionFilter(permission=Permission.BROADCAST))
 async def send_message_callback_handler(call: CallbackQuery, state: FSMContext):
     """Beginning of mailing"""
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("broadcast.prompt"),
         reply_markup=back("console"),
     )

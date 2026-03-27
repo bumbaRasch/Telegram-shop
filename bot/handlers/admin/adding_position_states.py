@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from urllib.parse import urlparse
 
 from aiogram import Router, F
@@ -24,7 +25,7 @@ async def add_item_callback_handler(call: CallbackQuery, state):
     """
     Ask administrator for a new position name.
     """
-    await call.message.edit_text(localize('admin.goods.add.prompt.name'), reply_markup=back("goods_management"))
+    await edit_msg(call.message, localize('admin.goods.add.prompt.name'), reply_markup=back("goods_management"))
     await state.set_state(AddItemFSM.waiting_item_name)
 
 
@@ -106,13 +107,13 @@ async def adding_value_to_position(call: CallbackQuery, state):
 
     if answer == 'no':
         # “Finish adding” button will appear after the first value is provided
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.goods.add.values.prompt_multi'),
             reply_markup=back("goods_management")
         )
         await state.set_state(AddItemFSM.waiting_values)
     else:
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize('admin.goods.add.single.prompt_value'),
             reply_markup=back('goods_management')
         )
@@ -190,7 +191,7 @@ async def finish_adding_items_callback_handler(call: CallbackQuery, state):
     if skipped_invalid:
         text_lines.append(localize('admin.goods.add.result.skipped_invalid', n=skipped_invalid))
 
-    await call.message.edit_text("\n".join(text_lines), parse_mode="HTML", reply_markup=back("goods_management"))
+    await edit_msg(call.message, "\n".join(text_lines), parse_mode="HTML", reply_markup=back("goods_management"))
 
     # Optionally notify a channel
     channel_username = _parse_channel_username()

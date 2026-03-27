@@ -11,6 +11,7 @@ from bot.database.methods.transactions import checkout_cart_transaction
 from bot.keyboards.inline import back, simple_buttons
 from bot.misc import EnvKeys
 from bot.i18n import localize
+from bot.handlers.user._helpers import edit_msg
 
 router = Router()
 
@@ -36,10 +37,7 @@ async def _show_cart(call: CallbackQuery):
     items = await get_cart_items(user_id)
 
     if not items:
-        await call.message.edit_text(
-            localize("cart.title") + "\n\n" + localize("cart.empty"),
-            reply_markup=back("profile"),
-        )
+        await edit_msg(call.message, localize("cart.title") + "\n\n" + localize("cart.empty"), back("profile"))
         return
 
     from bot.database.methods.read import get_item_info
@@ -71,11 +69,7 @@ async def _show_cart(call: CallbackQuery):
     buttons.append((localize("btn.cart_clear"), "cart_clear"))
     buttons.append((localize("btn.back"), "profile"))
 
-    await call.message.edit_text(
-        "\n".join(lines),
-        reply_markup=simple_buttons(buttons),
-        parse_mode="HTML",
-    )
+    await edit_msg(call.message, "\n".join(lines), simple_buttons(buttons), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "add_to_cart")
@@ -147,10 +141,7 @@ async def cart_checkout_handler(call: CallbackQuery, state: FSMContext):
         (localize("btn.yes"), "cart_checkout_confirm"),
         (localize("btn.no"), "cart"),
     ]
-    await call.message.edit_text(
-        localize("cart.checkout_confirm", count=count, total=total, currency=EnvKeys.PAY_CURRENCY),
-        reply_markup=simple_buttons(buttons),
-    )
+    await edit_msg(call.message, localize("cart.checkout_confirm", count=count, total=total, currency=EnvKeys.PAY_CURRENCY), simple_buttons(buttons))
 
 
 @router.callback_query(F.data == "cart_checkout_confirm")
@@ -169,10 +160,7 @@ async def cart_checkout_confirm_handler(call: CallbackQuery, state: FSMContext):
             "transaction_error": localize("errors.something_wrong"),
             "promo_expired_during_checkout": localize("cart.promo_expired"),
         }
-        await call.message.edit_text(
-            localize("cart.checkout_fail", reason=reason_map.get(msg, msg)),
-            reply_markup=back("cart"),
-        )
+        await edit_msg(call.message, localize("cart.checkout_fail", reason=reason_map.get(msg, msg)), back("cart"))
         return
 
     total = sum(r['price'] for r in results)
@@ -187,7 +175,8 @@ async def cart_checkout_confirm_handler(call: CallbackQuery, state: FSMContext):
         buttons.append((f"📦 {r['item_name']}", f"bought-item:{r['bought_id']}:cart_receipt"))
     buttons.append((localize("btn.back"), "profile"))
 
-    await call.message.edit_text(
+    await edit_msg(
+        call.message,
         localize(
             "cart.checkout_receipt",
             count=len(results),
@@ -197,8 +186,8 @@ async def cart_checkout_confirm_handler(call: CallbackQuery, state: FSMContext):
             user_id=user_id,
             datetime=dt,
         ),
+        simple_buttons(buttons),
         parse_mode="HTML",
-        reply_markup=simple_buttons(buttons),
     )
 
     from bot.database.methods.audit import log_audit
@@ -218,10 +207,7 @@ async def cart_receipt_handler(call: CallbackQuery, state: FSMContext):
     total = data.get("cart_receipt_total", 0)
 
     if not results:
-        await call.message.edit_text(
-            localize("cart.empty"),
-            reply_markup=back("profile"),
-        )
+        await edit_msg(call.message, localize("cart.empty"), back("profile"))
         return
 
     username = call.from_user.username or call.from_user.first_name
@@ -232,7 +218,8 @@ async def cart_receipt_handler(call: CallbackQuery, state: FSMContext):
         buttons.append((f"📦 {r['item_name']}", f"bought-item:{r['bought_id']}:cart_receipt"))
     buttons.append((localize("btn.back"), "profile"))
 
-    await call.message.edit_text(
+    await edit_msg(
+        call.message,
         localize(
             "cart.checkout_receipt",
             count=len(results),
@@ -242,6 +229,6 @@ async def cart_receipt_handler(call: CallbackQuery, state: FSMContext):
             user_id=call.from_user.id,
             datetime=dt,
         ),
+        simple_buttons(buttons),
         parse_mode="HTML",
-        reply_markup=simple_buttons(buttons),
     )

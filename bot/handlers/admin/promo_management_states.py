@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from datetime import datetime, timezone
 
 from aiogram import Router, F
@@ -33,7 +34,7 @@ async def promo_management_handler(call: CallbackQuery, state: FSMContext):
             (localize("admin.promo.create"), "promo_create"),
             (localize("btn.back"), "console"),
         ]
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize("admin.promo.title") + "\n\n" + localize("admin.promo.list_empty"),
             reply_markup=simple_buttons(buttons),
         )
@@ -56,7 +57,7 @@ async def promo_management_handler(call: CallbackQuery, state: FSMContext):
     kb.row(InlineKeyboardButton(text=localize("btn.back"), callback_data="console"))
     markup = kb.as_markup()
 
-    await call.message.edit_text(localize("admin.promo.title"), reply_markup=markup)
+    await edit_msg(call.message, localize("admin.promo.title"), reply_markup=markup)
     await state.update_data(promo_paginator=paginator.get_state())
 
 
@@ -81,7 +82,7 @@ async def navigate_promos(call: CallbackQuery, state: FSMContext):
     kb.row(InlineKeyboardButton(text=localize("btn.back"), callback_data="console"))
     markup = kb.as_markup()
 
-    await call.message.edit_text(localize("admin.promo.title"), reply_markup=markup)
+    await edit_msg(call.message, localize("admin.promo.title"), reply_markup=markup)
     await state.update_data(promo_paginator=paginator.get_state())
 
 
@@ -115,7 +116,7 @@ async def _show_promo_view(message, promo_id: int):
         ("🗑 Удалить", f"promo_d_{promo_id}"),
         (localize("btn.back"), "promo_mgmt"),
     ]
-    await message.edit_text(text, reply_markup=simple_buttons(buttons))
+    await edit_msg(message, text, reply_markup=simple_buttons(buttons))
 
 
 @router.callback_query(F.data.startswith("promo_v_"), HasPermissionFilter(permission=Permission.PROMO_MANAGE))
@@ -161,7 +162,7 @@ async def confirm_delete_promo(call: CallbackQuery, state: FSMContext):
         (localize("btn.yes"), f"promo_dc_{promo_id}"),
         (localize("btn.no"), f"promo_v_{promo_id}"),
     ]
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.promo.confirm_delete", code=code),
         reply_markup=simple_buttons(buttons),
     )
@@ -180,7 +181,7 @@ async def delete_promo_confirmed(call: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "promo_create", HasPermissionFilter(permission=Permission.PROMO_MANAGE))
 async def promo_create_start(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text(localize("admin.promo.prompt.code"), reply_markup=back("promo_mgmt"))
+    await edit_msg(call.message, localize("admin.promo.prompt.code"), reply_markup=back("promo_mgmt"))
     await state.set_state(PromoFSM.waiting_code)
 
 
@@ -217,7 +218,7 @@ async def promo_receive_type(call: CallbackQuery, state: FSMContext):
         type_label = "%"
     else:
         type_label = localize("admin.promo.type.fixed")
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("admin.promo.prompt.value", type=type_label),
         reply_markup=back("promo_mgmt"),
     )
@@ -300,7 +301,7 @@ async def promo_binding_type_chosen(call: CallbackQuery, state: FSMContext):
         prompt = localize("admin.promo.prompt.category_name")
     else:
         prompt = localize("admin.promo.prompt.item_name")
-    await call.message.edit_text(prompt, reply_markup=back("promo_mgmt"))
+    await edit_msg(call.message, prompt, reply_markup=back("promo_mgmt"))
     await state.set_state(PromoFSM.waiting_binding_name)
 
 
