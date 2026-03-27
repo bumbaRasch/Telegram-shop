@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -23,6 +24,9 @@ from bot.states import BalanceStates
 from bot.handlers.user._helpers import edit_msg
 
 router = Router()
+
+_INVOICE_COOLDOWN = 30.0  # seconds between invoice creation per user
+_invoice_last_time: dict[int, float] = {}
 
 
 async def _notify_referrer_bonus(bot, user_id: int, amount: int, payer_name: str, payer_id: int):
@@ -112,6 +116,16 @@ async def process_replenish_balance(call: CallbackQuery, state: FSMContext):
         await edit_msg(call.message, localize("menu.title"), back('back_to_menu'))
         await state.clear()
         return
+
+    # Rate limit: one invoice per _INVOICE_COOLDOWN seconds per user
+    user_id = call.from_user.id
+    now = time.monotonic()
+    last = _invoice_last_time.get(user_id, 0.0)
+    remaining = _INVOICE_COOLDOWN - (now - last)
+    if remaining > 0:
+        await call.answer(localize("payments.cooldown", seconds=int(remaining) + 1), show_alert=True)
+        return
+    _invoice_last_time[user_id] = now
 
     # Map callback data to provider
     provider_map = {

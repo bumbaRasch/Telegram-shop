@@ -75,8 +75,9 @@ async def start(message: Message, state: FSMContext):
                 await message.answer(localize("subscribe.prompt"), reply_markup=markup)
                 await message.delete()
                 return
-    except (TelegramBadRequest, TelegramForbiddenError) as e:
-        # Ignore channel errors (private channel, wrong link, etc.)
+    except Exception as e:
+        # Ignore all channel check errors (private channel, wrong link, network, etc.)
+        # On error fall through and show the menu — better than leaving user with empty screen
         logger.warning(f"Channel subscription check failed for user {user_id}: {e}")
 
     layout = await get_setting("menu_layout", "1")

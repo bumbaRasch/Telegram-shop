@@ -21,7 +21,7 @@ from bot.database.methods.audit import log_audit
 from bot.keyboards import item_info, back, lazy_paginated_keyboard
 from bot.keyboards.inline import simple_buttons, rating_keyboard
 from bot.i18n import localize
-from bot.misc import EnvKeys, LazyPaginator
+from bot.misc import EnvKeys, LazyPaginator, sanitize_html
 from bot.misc.metrics import get_metrics
 from bot.states import ShopStates
 from bot.states.review_state import ReviewFSM
@@ -94,9 +94,11 @@ async def _render_item_page(target, state: FSMContext, item_name: str, back_data
         reviews_enabled=reviews_enabled,
     )
 
+    safe_name = sanitize_html(item_name)
+    safe_desc = sanitize_html(item_info_data["description"] or "")
     text_lines = [
-        localize("shop.item.title", name=item_name),
-        localize("shop.item.description", description=item_info_data["description"]),
+        localize("shop.item.title", name=safe_name),
+        localize("shop.item.description", description=safe_desc),
         price_line,
         quantity_line,
     ]
@@ -309,7 +311,7 @@ async def item_info_callback_handler(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "apply_promo")
 async def apply_promo_handler(call: CallbackQuery, state: FSMContext):
     await edit_msg(call.message, localize("promo.enter_code"), back("back_to_item"))
-    await state.update_data(awaiting_promo=True)
+    await state.set_state(PromoFSM.waiting_item_promo)
 
 
 @router.callback_query(F.data == "remove_promo")
@@ -325,14 +327,13 @@ async def remove_promo_handler(call: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "back_to_item")
 async def back_to_item_handler(call: CallbackQuery, state: FSMContext):
-    """Return to item page, preserving promo state."""
+    """Return to item page, cancelling promo input if active."""
     data = await state.get_data()
     item_name = data.get('csrf_item')
     if not item_name:
-        # Fallback
         await edit_msg(call.message, localize("shop.item.not_found"), back("back_to_menu"))
         return
-    await state.update_data(awaiting_promo=False)
+    await state.set_state(None)
     await _render_item_page(call, state, item_name, user_id=call.from_user.id)
 
 
@@ -429,18 +430,15 @@ async def receive_review_text_handler(message: Message, state: FSMContext):
     await state.clear()
 
 
-# --- Promo code text input (catch-all, must be AFTER state-specific message handlers) ---
+# --- Promo code text input (FSM-scoped: only active when waiting_item_promo state is set) ---
 
-@router.message(F.text)
+@router.message(PromoFSM.waiting_item_promo, F.text)
 async def promo_code_text_handler(message: Message, state: FSMContext):
-    """Handle promo code text input when awaiting_promo is set."""
+    """Handle promo code text input for item purchase."""
     data = await state.get_data()
-    if not data.get('awaiting_promo'):
-        return  # Not awaiting promo input — skip
-
     item_name = data.get('csrf_item')
     if not item_name:
-        await state.update_data(awaiting_promo=False)
+        await state.set_state(None)
         return
 
     code = (message.text or "").strip().upper()
@@ -448,18 +446,17 @@ async def promo_code_text_handler(message: Message, state: FSMContext):
 
     if not valid:
         await message.answer(localize(error_key), reply_markup=back("back_to_item"))
-        await state.update_data(awaiting_promo=False)
+        await state.set_state(None)
         return
 
-    # Store promo data for discounted price display
     await state.update_data(
         applied_promo=code,
         applied_promo_data={
             'discount_type': promo_data.get('discount_type'),
             'discount_value': str(promo_data.get('discount_value', 0)),
         },
-        awaiting_promo=False,
     )
+    await state.set_state(None)
 
     # Re-render item page with discounted price
     await _render_item_page(message, state, item_name, user_id=message.from_user.id)

@@ -5,11 +5,11 @@ from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from bot.database.methods.create import add_to_cart
-from bot.database.methods.read import get_cart_items, get_cart_count
+from bot.database.methods.read import get_cart_items, get_cart_count, get_items_info_bulk
 from bot.database.methods.delete import remove_from_cart, clear_cart
 from bot.database.methods.transactions import checkout_cart_transaction
 from bot.keyboards.inline import back, simple_buttons
-from bot.misc import EnvKeys
+from bot.misc import EnvKeys, sanitize_html
 from bot.i18n import localize
 from bot.handlers.user._helpers import edit_msg
 
@@ -40,26 +40,28 @@ async def _show_cart(call: CallbackQuery):
         await edit_msg(call.message, localize("cart.title") + "\n\n" + localize("cart.empty"), back("profile"))
         return
 
-    from bot.database.methods.read import get_item_info
+    info_map = await get_items_info_bulk([item['item_name'] for item in items])
     lines = [localize("cart.title"), ""]
     real_total = Decimal(0)
     has_unavailable = False
 
     for item in items:
-        info = await get_item_info(item['item_name'])
+        info = info_map.get(item['item_name'])
         if not info:
-            lines.append(localize("cart.unavailable_warning", name=item['item_name']))
+            safe_name = sanitize_html(item['item_name'])
+            lines.append(localize("cart.unavailable_warning", name=safe_name))
             has_unavailable = True
             continue
 
         price = Decimal(str(info['price']))
         discounted = await _resolve_promo_price(price, item.get('promo_code'))
+        safe_name = sanitize_html(item['item_name'])
 
         if discounted is not None:
-            lines.append(f"🏷 <b>{item['item_name']}</b> — <s>{price}</s> {discounted} {EnvKeys.PAY_CURRENCY} ({item['promo_code']})")
+            lines.append(f"🏷 <b>{safe_name}</b> — <s>{price}</s> {discounted} {EnvKeys.PAY_CURRENCY} ({item['promo_code']})")
             real_total += discounted
         else:
-            lines.append(localize("cart.item", name=item['item_name'], price=price, currency=EnvKeys.PAY_CURRENCY))
+            lines.append(localize("cart.item", name=safe_name, price=price, currency=EnvKeys.PAY_CURRENCY))
             real_total += price
 
     lines.append(localize("cart.total", total=real_total, currency=EnvKeys.PAY_CURRENCY))
@@ -122,11 +124,11 @@ async def clear_cart_handler(call: CallbackQuery, state: FSMContext):
 
 async def _calc_cart_total_with_promos(user_id: int) -> Decimal:
     """Calculate real cart total considering promo codes on each item."""
-    from bot.database.methods.read import get_item_info
     items = await get_cart_items(user_id)
+    info_map = await get_items_info_bulk([item['item_name'] for item in items])
     total = Decimal(0)
     for item in items:
-        info = await get_item_info(item['item_name'])
+        info = info_map.get(item['item_name'])
         if not info:
             continue
         price = Decimal(str(info['price']))

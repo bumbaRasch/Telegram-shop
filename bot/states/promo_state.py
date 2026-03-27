@@ -10,3 +10,4 @@ class PromoFSM(StatesGroup):
     waiting_binding_type = State()
     waiting_binding_name = State()
     waiting_redeem_code = State()
+    waiting_item_promo = State()  # item-page promo code input
