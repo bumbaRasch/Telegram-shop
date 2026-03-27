@@ -2,8 +2,6 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from bot.misc import EnvKeys
-
 # Exported loggers (imported by other modules)
 logger = logging.getLogger("bot")
 audit_logger = logging.getLogger("bot.audit")
@@ -29,6 +27,8 @@ def configure_logging(console: bool = True, debug: bool = False):
         audit_logger.addHandler(sh)
 
     # file — only if explicitly enabled
+    from bot.misc import EnvKeys  # late import — avoids circular dependency
+
     if EnvKeys.LOG_TO_FILE == "1":
         bot_path = EnvKeys.BOT_LOGFILE
         audit_path = EnvKeys.BOT_AUDITFILE
