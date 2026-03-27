@@ -93,6 +93,9 @@ class Role(Database.BASE):
 class User(Database.BASE):
     __tablename__ = 'users'
     telegram_id = Column(BigInteger, primary_key=True)
+    username = Column(String(64), nullable=True, index=True)
+    first_name = Column(String(64), nullable=True)
+    last_name = Column(String(64), nullable=True)
     role_id = Column(Integer, ForeignKey('roles.id', ondelete="RESTRICT"), default=1, index=True)
     balance = Column(Numeric(12, 2), nullable=False, default=0)
     referral_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="SET NULL"), nullable=True, index=True)
@@ -119,14 +122,24 @@ class User(Database.BASE):
         lazy='raise',
     )
 
+    def __str__(self):
+        if self.username:
+            return f"@{self.username} ({self.telegram_id})"
+        parts = " ".join(p for p in (self.first_name, self.last_name) if p)
+        return f"{parts} ({self.telegram_id})" if parts else str(self.telegram_id)
+
     def __init__(self, telegram_id: int, registration_date: datetime.datetime, balance=0, referral_id=None,
-                 role_id: int = 1, **kw: Any):
+                 role_id: int = 1, username: str = None, first_name: str = None, last_name: str = None,
+                 **kw: Any):
         super().__init__(**kw)
         self.telegram_id = telegram_id
         self.role_id = role_id
         self.balance = balance
         self.referral_id = referral_id
         self.registration_date = registration_date
+        self.username = username
+        self.first_name = first_name
+        self.last_name = last_name
 
 
 class Categories(Database.BASE):
@@ -348,7 +361,37 @@ class Reviews(Database.BASE):
     )
 
 
+class BotSettings(Database.BASE):
+    __tablename__ = 'bot_settings'
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, nullable=False)
+    description = Column(String(256), nullable=True)
+
+    def __init__(self, key: str, value: str, description: str = None, **kw: Any):
+        super().__init__(**kw)
+        self.key = key
+        self.value = value
+        self.description = description
+
+    def __repr__(self):
+        return f'<BotSettings {self.key}={self.value!r}>'
+
+
+_DEFAULT_SETTINGS = {
+    'menu_layout': ('1', 'Main menu button layout: comma-separated row sizes (e.g. "1" or "2" or "1,2")'),
+}
+
+
+async def seed_settings():
+    async with Database().session() as s:
+        for key, (value, description) in _DEFAULT_SETTINGS.items():
+            result = await s.execute(select(BotSettings).filter_by(key=key))
+            if result.scalars().first() is None:
+                s.add(BotSettings(key=key, value=value, description=description))
+
+
 async def register_models():
     async with Database().engine.begin() as conn:
         await conn.run_sync(Database.BASE.metadata.create_all)
     await Role.insert_roles()
+    await seed_settings()
