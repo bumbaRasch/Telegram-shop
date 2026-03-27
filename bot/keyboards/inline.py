@@ -6,9 +6,19 @@ from bot.database.models import Permission
 from bot.misc import LazyPaginator # noqa: F401
 
 
-def main_menu(role: int, channel: str | None = None, helper: str | None = None) -> InlineKeyboardMarkup:
+def _parse_layout(layout: str) -> tuple[int, ...]:
+    """Parse a comma-separated layout string like "1" or "2" or "1,2" into a tuple of ints."""
+    try:
+        sizes = tuple(max(1, int(x.strip())) for x in layout.split(',') if x.strip())
+        return sizes if sizes else (1,)
+    except (ValueError, TypeError):
+        return (1,)
+
+
+def main_menu(role: int, channel: str | None = None, helper: str | None = None,
+              layout: str = "1") -> InlineKeyboardMarkup:
     """
-    Main menu.
+    Main menu. `layout` is a comma-separated row-sizes string, e.g. "1" or "2" or "1,2".
     """
     kb = InlineKeyboardBuilder()
     kb.button(text=localize("btn.shop"), callback_data="shop")
@@ -20,7 +30,7 @@ def main_menu(role: int, channel: str | None = None, helper: str | None = None) 
         kb.button(text=localize("btn.channel"), url=f"https://t.me/{channel.lstrip('@')}")
     if Permission.has_any_admin_perm(role):
         kb.button(text=localize("btn.admin_menu"), callback_data="console")
-    kb.adjust(2)
+    kb.adjust(*_parse_layout(layout))
     return kb.as_markup()
 
 

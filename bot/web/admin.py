@@ -57,7 +57,7 @@ from bot.database.main import Database
 from bot.database.models.main import (
     User, Role, Categories, Goods, ItemValues,
     BoughtGoods, Operations, Payments, ReferralEarnings,
-    AuditLog, PromoCodes, CartItems, Reviews,
+    AuditLog, PromoCodes, CartItems, Reviews, BotSettings,
 )
 from bot.misc.metrics import get_metrics
 from bot.misc.caching import get_cache_manager
@@ -138,9 +138,10 @@ class AuditModelView(ModelView):
 
 # Model Views
 class UserAdmin(AuditModelView, model=User):
-    column_list = [User.telegram_id, User.balance, User.role_id, User.referral_id,
+    column_list = [User.telegram_id, User.username, User.first_name, User.last_name,
+                   User.balance, User.role_id, User.referral_id,
                    User.registration_date, User.is_blocked]
-    column_searchable_list = [User.telegram_id]
+    column_searchable_list = [User.telegram_id, User.username]
     column_sortable_list = [User.telegram_id, User.balance, User.registration_date]
     column_default_sort = (User.registration_date, True)
     name = "User"
@@ -323,6 +324,38 @@ class CartItemsAdmin(ModelView, model=CartItems):
 
 
 
+class BotSettingsAdmin(ModelView, model=BotSettings):
+    column_list = [BotSettings.key, BotSettings.value, BotSettings.description]
+    column_sortable_list = [BotSettings.key]
+    column_searchable_list = [BotSettings.key]
+    column_default_sort = (BotSettings.key, False)
+    can_create = True
+    can_edit = True
+    can_delete = False
+    name = "Bot Setting"
+    name_plural = "Bot Settings"
+    icon = "fa-solid fa-sliders"
+    form_args = {
+        "value": {
+            "description": (
+                "menu_layout — comma-separated row sizes, e.g.: "
+                "\"1\" (all vertical) | \"2\" (2 per row) | \"1,2\" (1st row=1, rest=2) | \"3,2,1\""
+            )
+        }
+    }
+
+    async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
+        from bot.database.methods.read import invalidate_setting_cache
+        await invalidate_setting_cache(model.key)
+        await log_audit(
+            "setting_change",
+            resource_type="BotSettings",
+            resource_id=model.key,
+            details=f"value={model.value!r}",
+            ip_address=request.client.host,
+        )
+
+
 class ReviewsAdmin(AuditModelView, model=Reviews):
     column_list = [Reviews.id, Reviews.user_id, Reviews.item_name,
                    Reviews.rating, Reviews.text, Reviews.created_at]
@@ -417,6 +450,7 @@ def create_admin_app() -> Starlette:
     admin.add_view(AuditLogAdmin)
     admin.add_view(PromoCodeAdmin)
     admin.add_view(CartItemsAdmin)
+    admin.add_view(BotSettingsAdmin)
     if EnvKeys.REVIEWS_ENABLED == "1":
         admin.add_view(ReviewsAdmin)
 

@@ -7,7 +7,7 @@ from sqlalchemy import func, exists, select
 
 from bot.database.models import Database, User, ItemValues, Goods, Categories, Role, BoughtGoods, \
     Operations, ReferralEarnings, Permission
-from bot.database.models.main import PromoCodes, PromoCodeUsages, CartItems, Reviews
+from bot.database.models.main import PromoCodes, PromoCodeUsages, CartItems, Reviews, BotSettings
 from bot.misc.caching import get_cache_manager
 
 F = TypeVar('F', bound=Callable[..., Coroutine[Any, Any, Any]])
@@ -632,3 +632,19 @@ async def invalidate_rating_cache(item_name: str):
     cache = get_cache_manager()
     if cache:
         await cache.delete(f"avg_rating:{item_name}")
+
+
+@async_cached(ttl=60, key_prefix="bot_setting")
+async def get_setting(key: str, default: str = "") -> str:
+    """Read a bot setting from the database (cached 60 s)."""
+    async with Database().session() as s:
+        result = await s.execute(select(BotSettings).filter_by(key=key))
+        row = result.scalars().first()
+        return row.value if row else default
+
+
+async def invalidate_setting_cache(key: str):
+    """Invalidate cached bot setting."""
+    cache = get_cache_manager()
+    if cache:
+        await cache.delete(f"bot_setting:{key}")
