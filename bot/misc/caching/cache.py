@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
@@ -136,7 +137,7 @@ class CacheManager:
             return 0
 
 
-def cache_result(ttl: int = 300, key_prefix: str = "", key_func: callable | None = None):
+def cache_result(ttl: int = 300, key_prefix: str = "", key_func: Callable | None = None):
     """Decorator for caching function results"""
 
     def decorator(func):
