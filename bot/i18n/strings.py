@@ -124,8 +124,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.roles.assigned_notify": "ℹ️ Вам назначена роль: {role}",
         "admin.roles.edit_name_prompt": "Введите новое название роли (или /skip чтобы оставить текущее):",
         "btn.admin.assign_role": "🛡 Назначить роль",
+        "btn.admin.search_by_id": "🔍 Поиск по ID",
 
         # === Admin: User Management ===
+        "admin.users.list_title": "👥 Пользователи",
         "admin.users.prompt_enter_id": "👤 Введите id пользователя,\nчтобы посмотреть | изменить его данные",
         "admin.users.invalid_id": "⚠️ Введите корректный числовой ID пользователя.",
         "admin.users.profile_unavailable": "❌ Профиль недоступен (такого пользователя никогда не существовало)",
@@ -610,8 +612,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.roles.assigned_notify": "ℹ️ Your role has been set to: {role}",
         "admin.roles.edit_name_prompt": "Enter the new role name (or /skip to keep current):",
         "btn.admin.assign_role": "🛡 Assign role",
+        "btn.admin.search_by_id": "🔍 Search by ID",
 
         # === Admin: User Management ===
+        "admin.users.list_title": "👥 Users",
         "admin.users.prompt_enter_id": "👤 Enter the user ID to view / edit data",
         "admin.users.invalid_id": "⚠️ Please enter a valid numeric user ID.",
         "admin.users.profile_unavailable": "❌ Profile unavailable (such user never existed)",

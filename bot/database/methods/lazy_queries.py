@@ -60,17 +60,20 @@ async def query_user_bought_items(user_id: int, offset: int = 0, limit: int = 10
 
 
 async def query_all_users(offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
-    """Query all users with pagination"""
+    """Query all users with pagination, returning id + username/first_name"""
     async with Database().session() as s:
         if count_only:
             return (await s.execute(select(func.count(User.telegram_id)))).scalar() or 0
         result = await s.execute(
-            select(User.telegram_id)
+            select(User.telegram_id, User.username, User.first_name)
             .order_by(User.telegram_id.asc())
             .offset(offset)
             .limit(limit)
         )
-        return [row[0] for row in result.all()]
+        return [
+            {'telegram_id': row.telegram_id, 'username': row.username, 'first_name': row.first_name}
+            for row in result.all()
+        ]
 
 
 async def query_items_in_position(item_name: str, offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:

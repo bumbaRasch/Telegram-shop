@@ -1,3 +1,4 @@
+from bot.handlers.user._helpers import edit_msg
 from decimal import Decimal
 from functools import partial
 
@@ -14,6 +15,7 @@ from bot.database.methods import (
     query_user_bought_items, query_user_referrals, query_referral_earnings_from_user, query_all_referral_earnings,
     is_user_blocked, admin_balance_change
 )
+from bot.database.methods.lazy_queries import query_all_users
 from bot.keyboards import back, close, simple_buttons, lazy_paginated_keyboard
 from bot.database.methods.audit import log_audit
 from bot.filters import HasPermissionFilter
@@ -102,16 +104,76 @@ async def _build_user_profile(bot, target_id: int, caller_perms: int = 0):
     return '\n'.join(lines), markup
 
 
+def _user_label(u: dict) -> str:
+    """Format user list button label: ID | @username  or  ID | FirstName  or just ID."""
+    tid = u['telegram_id']
+    if u.get('username'):
+        return f"{tid} | @{u['username']}"
+    if u.get('first_name'):
+        return f"{tid} | {u['first_name']}"
+    return str(tid)
+
+
+async def _show_user_list(call: CallbackQuery, state: FSMContext, page: int):
+    paginator = LazyPaginator(query_all_users, per_page=10)
+    total = await paginator.get_total_count()
+
+    if total == 0:
+        await edit_msg(call.message, localize('admin.users.prompt_enter_id'), reply_markup=back('console'))
+        await state.set_state(UserMgmtStates.waiting_user_id_for_check)
+        return
+
+    from aiogram.types import InlineKeyboardButton
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    items = await paginator.get_page(page)
+    total_pages = await paginator.get_total_pages()
+
+    kb = InlineKeyboardBuilder()
+    for u in items:
+        kb.button(text=_user_label(u), callback_data=f"check-user_{u['telegram_id']}")
+    kb.adjust(1)
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀️", callback_data=f"users-page_{page - 1}"))
+    if total_pages > 1:
+        nav.append(InlineKeyboardButton(text=f"{page + 1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton(text="▶️", callback_data=f"users-page_{page + 1}"))
+    if nav:
+        kb.row(*nav)
+
+    kb.row(InlineKeyboardButton(text=localize('btn.admin.search_by_id'), callback_data="user_search_by_id"))
+    kb.row(InlineKeyboardButton(text=localize('btn.back'), callback_data="console"))
+
+    await edit_msg(call.message, localize('admin.users.list_title'), reply_markup=kb.as_markup())
+    await state.update_data(user_list_page=page)
+
+
 @router.callback_query(F.data == 'user_management', HasPermissionFilter(Permission.USERS_MANAGE))
 async def user_callback_handler(call: CallbackQuery, state: FSMContext):
-    """
-    Asks admin to enter a user's ID to view / modify.
-    """
+    """Show paginated list of users with search-by-ID option."""
     await state.clear()
-    await call.message.edit_text(
-        localize('admin.users.prompt_enter_id'),
-        reply_markup=back('console')
-    )
+    await _show_user_list(call, state, 0)
+
+
+@router.callback_query(F.data.startswith('users-page_'), HasPermissionFilter(Permission.USERS_MANAGE))
+async def users_pagination_handler(call: CallbackQuery, state: FSMContext):
+    """Navigate pages of the user list."""
+    try:
+        page = int(call.data.split('_')[1])
+    except (ValueError, IndexError):
+        await call.answer(localize('errors.pagination_invalid'))
+        return
+    await _show_user_list(call, state, page)
+
+
+@router.callback_query(F.data == 'user_search_by_id', HasPermissionFilter(Permission.USERS_MANAGE))
+async def user_search_by_id_handler(call: CallbackQuery, state: FSMContext):
+    """Ask admin to enter a user ID manually."""
+    await state.clear()
+    await edit_msg(call.message, localize('admin.users.prompt_enter_id'), reply_markup=back('user_management'))
     await state.set_state(UserMgmtStates.waiting_user_id_for_check)
 
 
@@ -162,7 +224,7 @@ async def user_profile_view(call: CallbackQuery):
         return
 
     text, markup = result
-    await call.message.edit_text(text, parse_mode='HTML', reply_markup=markup)
+    await edit_msg(call.message, text, parse_mode='HTML', reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith('admin-view-referrals_'), HasPermissionFilter(Permission.USERS_MANAGE))
@@ -183,7 +245,7 @@ async def admin_view_referrals_handler(call: CallbackQuery, state: FSMContext):
     # Check if there are any referrals
     total = await paginator.get_total_count()
     if total == 0:
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize("referrals.list.empty"),
             reply_markup=back(f"check-user_{user_id}")
         )
@@ -202,7 +264,7 @@ async def admin_view_referrals_handler(call: CallbackQuery, state: FSMContext):
     )
 
     user_info = await call.message.bot.get_chat(user_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize(
             "referrals.list.title") + f"\n(<a href='tg://user?id={user_id}'>{user_info.first_name}</a> - {user_id})",
         reply_markup=markup
@@ -246,7 +308,7 @@ async def admin_referrals_pagination_handler(call: CallbackQuery, state: FSMCont
     )
 
     user_info = await call.message.bot.get_chat(user_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize(
             "referrals.list.title") + f"\n(<a href='tg://user?id={user_id}'>{user_info.first_name}</a> - {user_id})",
         reply_markup=markup
@@ -277,7 +339,7 @@ async def admin_referral_earnings_handler(call: CallbackQuery, state: FSMContext
     total = await paginator.get_total_count()
     if total == 0:
         referral_info = await call.message.bot.get_chat(referral_id)
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize("referral.earnings.empty", id=referral_id, name=referral_info.first_name),
             reply_markup=back(f"admin-view-referrals_{user_id}")
         )
@@ -298,7 +360,7 @@ async def admin_referral_earnings_handler(call: CallbackQuery, state: FSMContext
 
     referral_info = await call.message.bot.get_chat(referral_id)
     title_text = localize("referral.earnings.title", telegram_id=referral_id, name=referral_info.first_name)
-    await call.message.edit_text(title_text, reply_markup=markup)
+    await edit_msg(call.message, title_text, reply_markup=markup)
 
     # Save state
     await state.update_data(admin_ref_earnings_paginator=paginator.get_state())
@@ -322,7 +384,7 @@ async def admin_view_all_earnings_handler(call: CallbackQuery, state: FSMContext
     # Check if there are any earnings
     total = await paginator.get_total_count()
     if total == 0:
-        await call.message.edit_text(
+        await edit_msg(call.message, 
             localize("all.earnings.empty"),
             reply_markup=back(f"check-user_{user_id}")
         )
@@ -342,7 +404,7 @@ async def admin_view_all_earnings_handler(call: CallbackQuery, state: FSMContext
     )
 
     user_info = await call.message.bot.get_chat(user_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("all.earnings.title") + f"\n(<a href='tg://user?id={user_id}'>{user_info.first_name}</a> - {user_id})",
         reply_markup=markup
     )
@@ -386,7 +448,7 @@ async def admin_all_earnings_pagination_handler(call: CallbackQuery, state: FSMC
     )
 
     user_info = await call.message.bot.get_chat(user_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize("all.earnings.title") + f"\n(<a href='tg://user?id={user_id}'>{user_info.first_name}</a> - {user_id})",
         reply_markup=markup
     )
@@ -415,7 +477,7 @@ async def admin_earning_detail_handler(call: CallbackQuery):
 
     referral_info = await call.message.bot.get_chat(earning_info['referral_id'])
 
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('referral.item.info',
                  id=earning_id,
                  telegram_id=earning_info['referral_id'],
@@ -453,7 +515,7 @@ async def user_items_callback_handler(call: CallbackQuery, state: FSMContext):
         nav_cb_prefix=f"bought-goods-page_{user_id}_"
     )
 
-    await call.message.edit_text(localize('purchases.title'), reply_markup=markup)
+    await edit_msg(call.message, localize('purchases.title'), reply_markup=markup)
 
     # Save state for admin viewing user's items
     await state.update_data(admin_user_items_paginator=paginator.get_state())
@@ -471,7 +533,7 @@ async def replenish_user_balance_callback_handler(call: CallbackQuery, state: FS
         await call.answer(localize('errors.invalid_data'), show_alert=True)
         return
 
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('payments.replenish_prompt', currency=EnvKeys.PAY_CURRENCY),
         reply_markup=back(f'check-user_{user_id}')
     )
@@ -557,7 +619,7 @@ async def deduct_user_balance_callback_handler(call: CallbackQuery, state: FSMCo
         await call.answer(localize('errors.invalid_data'), show_alert=True)
         return
 
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('payments.deduct_prompt', currency=EnvKeys.PAY_CURRENCY),
         reply_markup=back(f'check-user_{user_id}')
     )
@@ -673,7 +735,7 @@ async def block_user_handler(call: CallbackQuery):
             return
 
     user_info = await call.message.bot.get_chat(user_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.users.blocked.success', name=user_info.first_name),
         reply_markup=back(f'check-user_{user_id}')
     )
@@ -702,7 +764,7 @@ async def unblock_user_handler(call: CallbackQuery):
             return
 
     user_info = await call.message.bot.get_chat(user_id)
-    await call.message.edit_text(
+    await edit_msg(call.message, 
         localize('admin.users.unblocked.success', name=user_info.first_name),
         reply_markup=back(f'check-user_{user_id}')
     )
