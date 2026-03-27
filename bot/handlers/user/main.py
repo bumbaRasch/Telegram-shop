@@ -1,34 +1,35 @@
+import datetime
 import functools
 
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
+from aiogram import F, Router
 from aiogram.enums.chat_type import ChatType
 from aiogram.fsm.context import FSMContext
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-import datetime
-
-from bot.handlers.user._helpers import edit_msg, edit_media_msg, get_photo, cache_photo, MENU_PHOTO_PATH
-
 from bot.database.methods import (
-    select_max_role_id, create_user, check_role, check_user,
-    select_user_operations, select_user_items, check_user_cached
+    check_role,
+    check_user,
+    check_user_cached,
+    create_user,
+    select_max_role_id,
+    select_user_items,
+    select_user_operations,
 )
-from bot.database.methods.read import get_cart_count, get_setting
 from bot.database.methods.lazy_queries import query_user_operations_history
-from bot.handlers.other import check_sub_channel, _parse_channel_username
-from bot.keyboards import main_menu, back, profile_keyboard, check_sub
-from bot.keyboards.inline import simple_buttons, lazy_paginated_keyboard
+from bot.database.methods.read import get_cart_count, get_setting
+from bot.handlers.other import _parse_channel_username, check_sub_channel
+from bot.handlers.user._helpers import MENU_PHOTO_PATH, cache_photo, edit_media_msg, edit_msg, get_photo
+from bot.i18n import localize
+from bot.keyboards import back, check_sub, main_menu, profile_keyboard
+from bot.logger_mesh import logger
 from bot.misc import EnvKeys, LazyPaginator
 from bot.misc.metrics import get_metrics
-from bot.i18n import localize
-from bot.logger_mesh import logger
 
 router = Router()
 
 
-@router.message(F.text.startswith('/start'))
+@router.message(F.text.startswith("/start"))
 async def start(message: Message, state: FSMContext):
     """
     Handle /start:
@@ -51,7 +52,7 @@ async def start(message: Message, state: FSMContext):
     # registration_date is DateTime
     await create_user(
         telegram_id=int(user_id),
-        registration_date=datetime.datetime.now(datetime.timezone.utc),
+        registration_date=datetime.datetime.now(datetime.UTC),
         referral_id=int(referral_id) if referral_id else None,
         role=user_role,
         username=message.from_user.username,
@@ -86,11 +87,11 @@ async def start(message: Message, state: FSMContext):
     markup = main_menu(role=role_data, channel=channel_username, helper=EnvKeys.HELPER_ID, layout=layout)
     photo = get_photo(MENU_PHOTO_PATH)
     try:
-        sent = await message.answer_photo(photo, caption=localize("menu.title"), reply_markup=markup, parse_mode='HTML')
+        sent = await message.answer_photo(photo, caption=localize("menu.title"), reply_markup=markup, parse_mode="HTML")
         if sent.photo:
             cache_photo(MENU_PHOTO_PATH, sent.photo[-1].file_id)
     except Exception:
-        await message.answer(localize("menu.title"), reply_markup=markup, parse_mode='HTML')
+        await message.answer(localize("menu.title"), reply_markup=markup, parse_mode="HTML")
     await message.delete()
     await state.clear()
 
@@ -105,7 +106,7 @@ async def back_to_menu_callback_handler(call: CallbackQuery, state: FSMContext):
     if not user:
         await create_user(
             telegram_id=user_id,
-            registration_date=datetime.datetime.now(datetime.timezone.utc),
+            registration_date=datetime.datetime.now(datetime.UTC),
             referral_id=None,
             role=1,
             username=call.from_user.username,
@@ -114,7 +115,7 @@ async def back_to_menu_callback_handler(call: CallbackQuery, state: FSMContext):
         )
         user = await check_user_cached(user_id)
 
-    role_id = user.get('role_id')
+    role_id = user.get("role_id")
 
     channel_username = _parse_channel_username()
     layout = await get_setting("menu_layout", "1")
@@ -145,7 +146,7 @@ async def profile_callback_handler(call: CallbackQuery, state: FSMContext):
     tg_user = call.from_user
     user_info = await check_user_cached(user_id)
 
-    balance = user_info.get('balance')
+    balance = user_info.get("balance")
     operations = await select_user_operations(user_id)
     overall_balance = sum(operations) if operations else 0
     items = await select_user_items(user_id)
@@ -160,7 +161,7 @@ async def profile_callback_handler(call: CallbackQuery, state: FSMContext):
         f"{localize('profile.total_topup', amount=overall_balance, currency=EnvKeys.PAY_CURRENCY)}\n"
         f"{localize('profile.purchased_count', count=items)}"
     )
-    await edit_msg(call.message, text, markup, parse_mode='HTML')
+    await edit_msg(call.message, text, markup, parse_mode="HTML")
     await state.clear()
 
 
@@ -178,7 +179,7 @@ async def check_sub_to_channel(call: CallbackQuery, state: FSMContext):
         chat_member = await call.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
         if await check_sub_channel(chat_member):
             user = await check_user_cached(user_id)
-            role_id = user.get('role_id')
+            role_id = user.get("role_id")
             layout = await get_setting("menu_layout", "1")
             markup = main_menu(role_id, channel_username, helper, layout=layout)
             await edit_media_msg(call.message, MENU_PHOTO_PATH, localize("menu.title"), markup)
@@ -189,6 +190,7 @@ async def check_sub_to_channel(call: CallbackQuery, state: FSMContext):
 
 
 # --- Operation History ---
+
 
 @router.callback_query(F.data == "operation_history")
 async def operation_history_handler(call: CallbackQuery, state: FSMContext):
@@ -213,16 +215,16 @@ async def _show_operations_page(call: CallbackQuery, state: FSMContext, user_id:
 
     lines = [localize("history.title"), ""]
     for op in items:
-        op_type = op['type']
-        amount = op['amount']
-        date = op['date']
+        op_type = op["type"]
+        amount = op["amount"]
+        date = op["date"]
         date_str = str(date)[:19] if date else ""
 
-        if op_type == 'topup':
+        if op_type == "topup":
             lines.append(localize("history.topup", amount=amount, currency=EnvKeys.PAY_CURRENCY))
-        elif op_type == 'purchase':
+        elif op_type == "purchase":
             lines.append(localize("history.purchase", amount=amount, currency=EnvKeys.PAY_CURRENCY))
-        elif op_type == 'referral':
+        elif op_type == "referral":
             lines.append(localize("history.referral", amount=amount, currency=EnvKeys.PAY_CURRENCY))
         lines.append(localize("history.date", date=date_str))
         lines.append("")
@@ -240,5 +242,3 @@ async def _show_operations_page(call: CallbackQuery, state: FSMContext, user_id:
     kb.row(InlineKeyboardButton(text=localize("btn.back"), callback_data="profile"))
 
     await edit_msg(call.message, "\n".join(lines), kb.as_markup())
-
-

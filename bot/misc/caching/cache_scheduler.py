@@ -1,7 +1,8 @@
 import asyncio
 from datetime import datetime
-from bot.misc.caching import get_cache_manager
+
 from bot.logger_mesh import logger
+from bot.misc.caching import get_cache_manager
 
 
 async def redis_health_monitor():
@@ -60,19 +61,13 @@ class CacheScheduler:
     async def start(self):
         """Starting the scheduler"""
         # Invalidate statistics every hour
-        self.tasks.append(
-            asyncio.create_task(invalidate_stats_periodically())
-        )
+        self.tasks.append(asyncio.create_task(invalidate_stats_periodically()))
 
         # Invalidation of outdated data once a day
-        self.tasks.append(
-            asyncio.create_task(daily_cleanup())
-        )
+        self.tasks.append(asyncio.create_task(daily_cleanup()))
 
         # Redis health monitor
-        self.tasks.append(
-            asyncio.create_task(redis_health_monitor())
-        )
+        self.tasks.append(asyncio.create_task(redis_health_monitor()))
 
         logger.info("Cache scheduler started")
 

@@ -1,20 +1,33 @@
 import datetime
+from collections.abc import Callable, Coroutine
+from datetime import UTC
 from decimal import Decimal
 from functools import wraps
-from typing import Optional, Dict, TypeVar, Callable, Any, Coroutine
+from typing import Any, TypeVar
 
-from sqlalchemy import func, exists, select
+from sqlalchemy import exists, func, select
 
-from bot.database.models import Database, User, ItemValues, Goods, Categories, Role, BoughtGoods, \
-    Operations, ReferralEarnings, Permission
-from bot.database.models.main import PromoCodes, PromoCodeUsages, CartItems, Reviews, BotSettings
+from bot.database.models import (
+    BoughtGoods,
+    Categories,
+    Database,
+    Goods,
+    ItemValues,
+    Operations,
+    Permission,
+    ReferralEarnings,
+    Role,
+    User,
+)
+from bot.database.models.main import BotSettings, CartItems, PromoCodes, PromoCodeUsages, Reviews
 from bot.misc.caching import get_cache_manager
 
-F = TypeVar('F', bound=Callable[..., Coroutine[Any, Any, Any]])
+F = TypeVar("F", bound=Callable[..., Coroutine[Any, Any, Any]])
 
 
 def async_cached(ttl: int = 300, key_prefix: str = "") -> Callable[[F], F]:
     """Decorator for async functions with caching."""
+
     def decorator(async_func: F) -> F:
         @wraps(async_func)
         async def async_wrapper(*args, **kwargs):
@@ -40,7 +53,7 @@ def async_cached(ttl: int = 300, key_prefix: str = "") -> Callable[[F], F]:
 
 def _day_window(date_str: str) -> tuple[datetime.datetime, datetime.datetime]:
     d = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-    start = datetime.datetime.combine(d, datetime.time.min, tzinfo=datetime.timezone.utc)
+    start = datetime.datetime.combine(d, datetime.time.min, tzinfo=datetime.UTC)
     end = start + datetime.timedelta(days=1)
     return start, end
 
@@ -52,7 +65,8 @@ def _obj_to_dict(obj, model) -> dict:
 
 # --- Async implementations ---
 
-async def check_user(telegram_id: int | str) -> Optional[dict]:
+
+async def check_user(telegram_id: int | str) -> dict | None:
     """Return user by Telegram ID or None if not found."""
     async with Database().session() as s:
         result = await s.execute(select(User).where(User.telegram_id == telegram_id))
@@ -69,7 +83,7 @@ async def check_role(telegram_id: int) -> int:
         return result.scalar() or 0
 
 
-async def get_role_id_by_name(role_name: str) -> Optional[int]:
+async def get_role_id_by_name(role_name: str) -> int | None:
     """Return role id by name or None."""
     async with Database().session() as s:
         return (await s.execute(select(Role.id).where(Role.name == role_name))).scalar()
@@ -82,7 +96,7 @@ async def check_role_name_by_id(role_id: int) -> str:
         return result.scalar_one()
 
 
-async def select_max_role_id() -> Optional[int]:
+async def select_max_role_id() -> int | None:
     """Return role_id with the highest numeric permissions value (OWNER=127)."""
     async with Database().session() as s:
         result = await s.execute(select(Role.id).order_by(Role.permissions.desc()).limit(1))
@@ -95,7 +109,7 @@ async def get_all_roles() -> list[dict]:
     async with Database().session() as s:
         result = await s.execute(select(Role).order_by(Role.permissions.asc()))
         roles = result.scalars().all()
-        return [{'id': r.id, 'name': r.name, 'permissions': r.permissions, 'default': r.default} for r in roles]
+        return [{"id": r.id, "name": r.name, "permissions": r.permissions, "default": r.default} for r in roles]
 
 
 async def get_role_by_id(role_id: int) -> dict | None:
@@ -103,7 +117,7 @@ async def get_role_by_id(role_id: int) -> dict | None:
     async with Database().session() as s:
         result = await s.execute(select(Role).where(Role.id == role_id))
         r = result.scalars().first()
-        return {'id': r.id, 'name': r.name, 'permissions': r.permissions, 'default': r.default} if r else None
+        return {"id": r.id, "name": r.name, "permissions": r.permissions, "default": r.default} if r else None
 
 
 async def get_roles_with_max_perms(max_perms: int) -> list[dict]:
@@ -112,7 +126,7 @@ async def get_roles_with_max_perms(max_perms: int) -> list[dict]:
         result = await s.execute(select(Role).order_by(Role.permissions.asc()))
         roles = result.scalars().all()
         return [
-            {'id': r.id, 'name': r.name, 'permissions': r.permissions, 'default': r.default}
+            {"id": r.id, "name": r.name, "permissions": r.permissions, "default": r.default}
             for r in roles
             if (r.permissions & ~max_perms) == 0
         ]
@@ -121,9 +135,7 @@ async def get_roles_with_max_perms(max_perms: int) -> list[dict]:
 async def count_users_with_role(role_id: int) -> int:
     """Return count of users assigned to a given role."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count(User.telegram_id)).where(User.role_id == role_id)
-        )).scalar() or 0
+        return (await s.execute(select(func.count(User.telegram_id)).where(User.role_id == role_id))).scalar() or 0
 
 
 async def get_roles_with_user_counts() -> list[dict]:
@@ -137,22 +149,20 @@ async def get_roles_with_user_counts() -> list[dict]:
             .having(func.count(User.telegram_id) > 0)
             .order_by(Role.permissions.asc())
         )
-        return [
-            {'name': name, 'permissions': perms, 'user_count': count}
-            for name, perms, count in result.all()
-        ]
+        return [{"name": name, "permissions": perms, "user_count": count} for name, perms, count in result.all()]
 
 
 async def select_today_users(date: str) -> int:
     """Return count of users registered on given date (YYYY-MM-DD)."""
     start_of_day, end_of_day = _day_window(date)
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count()).select_from(User).where(
-                User.registration_date >= start_of_day,
-                User.registration_date < end_of_day
+        return (
+            await s.execute(
+                select(func.count())
+                .select_from(User)
+                .where(User.registration_date >= start_of_day, User.registration_date < end_of_day)
             )
-        )).scalar() or 0
+        ).scalar() or 0
 
 
 async def get_user_count() -> int:
@@ -164,11 +174,13 @@ async def get_user_count() -> int:
 async def select_admins() -> int:
     """Return count of users whose role has any admin permission (beyond USE)."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count(User.telegram_id))
-            .join(Role, User.role_id == Role.id)
-            .where(Role.permissions.op('&')(~Permission.USE) != 0)
-        )).scalar() or 0
+        return (
+            await s.execute(
+                select(func.count(User.telegram_id))
+                .join(Role, User.role_id == Role.id)
+                .where(Role.permissions.op("&")(~Permission.USE) != 0)
+            )
+        ).scalar() or 0
 
 
 async def get_all_users() -> list[tuple[int]]:
@@ -207,7 +219,7 @@ async def get_goods_info(item_id: int) -> dict | None:
     """Return item_value row as dict by id, including item_name from Goods."""
     async with Database().session() as s:
         result = await s.execute(
-            select(ItemValues, Goods.name.label('item_name'))
+            select(ItemValues, Goods.name.label("item_name"))
             .join(Goods, Goods.id == ItemValues.item_id)
             .where(ItemValues.id == int(item_id))
         )
@@ -215,7 +227,7 @@ async def get_goods_info(item_id: int) -> dict | None:
         if not row:
             return None
         d = _obj_to_dict(row.ItemValues, ItemValues)
-        d['item_name'] = row.item_name
+        d["item_name"] = row.item_name
         return d
 
 
@@ -230,31 +242,37 @@ async def check_category(category_name: str) -> dict | None:
 async def select_item_values_amount(item_name: str) -> int:
     """Return count of item_values for an item (by item name)."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count(ItemValues.id))
-            .join(Goods, Goods.id == ItemValues.item_id)
-            .where(Goods.name == item_name)
-        )).scalar() or 0
+        return (
+            await s.execute(
+                select(func.count(ItemValues.id))
+                .join(Goods, Goods.id == ItemValues.item_id)
+                .where(Goods.name == item_name)
+            )
+        ).scalar() or 0
 
 
 async def check_value(item_name: str) -> bool:
     """Return True if item has any infinite value (is_infinity=True)."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(exists().where(
-                ItemValues.item_id == Goods.id,
-                Goods.name == item_name,
-                ItemValues.is_infinity.is_(True),
-            ))
-        )).scalar()
+        return (
+            await s.execute(
+                select(
+                    exists().where(
+                        ItemValues.item_id == Goods.id,
+                        Goods.name == item_name,
+                        ItemValues.is_infinity.is_(True),
+                    )
+                )
+            )
+        ).scalar()
 
 
 async def select_user_items(buyer_id: int | str) -> int:
     """Return count of bought items for user."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count()).select_from(BoughtGoods).where(BoughtGoods.buyer_id == buyer_id)
-        )).scalar() or 0
+        return (
+            await s.execute(select(func.count()).select_from(BoughtGoods).where(BoughtGoods.buyer_id == buyer_id))
+        ).scalar() or 0
 
 
 async def select_bought_item(unique_id: int) -> dict | None:
@@ -292,37 +310,36 @@ async def select_count_bought_items() -> int:
 async def select_unique_buyers() -> int:
     """Return count of unique users who made at least one purchase."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count(func.distinct(BoughtGoods.buyer_id)))
-        )).scalar() or 0
+        return (await s.execute(select(func.count(func.distinct(BoughtGoods.buyer_id))))).scalar() or 0
 
 
 async def select_avg_order() -> Decimal:
     """Return average purchase price."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.avg(BoughtGoods.price))
-        )).scalar() or Decimal(0)
+        return (await s.execute(select(func.avg(BoughtGoods.price)))).scalar() or Decimal(0)
 
 
 async def select_today_orders_count(date: str) -> int:
     """Return number of purchases for given date."""
     start_of_day, end_of_day = _day_window(date)
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count()).select_from(BoughtGoods).where(
-                BoughtGoods.bought_datetime >= start_of_day,
-                BoughtGoods.bought_datetime < end_of_day
+        return (
+            await s.execute(
+                select(func.count())
+                .select_from(BoughtGoods)
+                .where(BoughtGoods.bought_datetime >= start_of_day, BoughtGoods.bought_datetime < end_of_day)
             )
-        )).scalar() or 0
+        ).scalar() or 0
 
 
 async def select_blocked_users_count() -> int:
     """Return count of blocked users."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count()).select_from(User).where(User.is_blocked == True)  # noqa: E712
-        )).scalar() or 0
+        return (
+            await s.execute(
+                select(func.count()).select_from(User).where(User.is_blocked == True)  # noqa: E712
+            )
+        ).scalar() or 0
 
 
 async def get_blocked_user_ids() -> list[int]:
@@ -338,12 +355,13 @@ async def select_today_orders(date: str) -> Decimal:
     """Return total revenue for given date (YYYY-MM-DD)."""
     start_of_day, end_of_day = _day_window(date)
     async with Database().session() as s:
-        res = (await s.execute(
-            select(func.sum(BoughtGoods.price)).where(
-                BoughtGoods.bought_datetime >= start_of_day,
-                BoughtGoods.bought_datetime < end_of_day
+        res = (
+            await s.execute(
+                select(func.sum(BoughtGoods.price)).where(
+                    BoughtGoods.bought_datetime >= start_of_day, BoughtGoods.bought_datetime < end_of_day
+                )
             )
-        )).scalar()
+        ).scalar()
         return res or Decimal(0)
 
 
@@ -357,12 +375,13 @@ async def select_today_operations(date: str) -> Decimal:
     """Return total operations value for given date (YYYY-MM-DD)."""
     start_of_day, end_of_day = _day_window(date)
     async with Database().session() as s:
-        res = (await s.execute(
-            select(func.sum(Operations.operation_value)).where(
-                Operations.operation_time >= start_of_day,
-                Operations.operation_time < end_of_day
+        res = (
+            await s.execute(
+                select(func.sum(Operations.operation_value)).where(
+                    Operations.operation_time >= start_of_day, Operations.operation_time < end_of_day
+                )
             )
-        )).scalar()
+        ).scalar()
         return res or Decimal(0)
 
 
@@ -381,21 +400,19 @@ async def select_users_balance():
 async def select_user_operations(user_id: int | str) -> list[float]:
     """Return list of operation amounts for user."""
     async with Database().session() as s:
-        result = await s.execute(
-            select(Operations.operation_value).where(Operations.user_id == user_id)
-        )
+        result = await s.execute(select(Operations.operation_value).where(Operations.user_id == user_id))
         return [row[0] for row in result.all()]
 
 
 async def check_user_referrals(user_id: int) -> int:
     """Return count of referrals of the user."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count()).select_from(User).where(User.referral_id == user_id)
-        )).scalar() or 0
+        return (
+            await s.execute(select(func.count()).select_from(User).where(User.referral_id == user_id))
+        ).scalar() or 0
 
 
-async def get_user_referral(user_id: int) -> Optional[int]:
+async def get_user_referral(user_id: int) -> int | None:
     """Return referral_id of the user or None."""
     async with Database().session() as s:
         result = await s.execute(select(User.referral_id).where(User.telegram_id == user_id))
@@ -403,24 +420,24 @@ async def get_user_referral(user_id: int) -> Optional[int]:
         return row[0] if row else None
 
 
-async def get_referral_earnings_stats(referrer_id: int) -> Dict:
+async def get_referral_earnings_stats(referrer_id: int) -> dict:
     """Get statistics on user referral charges."""
     async with Database().session() as s:
         result = await s.execute(
             select(
-                func.count(ReferralEarnings.id).label('total_earnings_count'),
-                func.sum(ReferralEarnings.amount).label('total_amount'),
-                func.sum(ReferralEarnings.original_amount).label('total_original_amount'),
-                func.count(func.distinct(ReferralEarnings.referral_id)).label('active_referrals_count')
+                func.count(ReferralEarnings.id).label("total_earnings_count"),
+                func.sum(ReferralEarnings.amount).label("total_amount"),
+                func.sum(ReferralEarnings.original_amount).label("total_original_amount"),
+                func.count(func.distinct(ReferralEarnings.referral_id)).label("active_referrals_count"),
             ).where(ReferralEarnings.referrer_id == referrer_id)
         )
         stats = result.first()
 
         return {
-            'total_earnings_count': stats.total_earnings_count or 0,
-            'total_amount': stats.total_amount or Decimal(0),
-            'total_original_amount': stats.total_original_amount or Decimal(0),
-            'active_referrals_count': stats.active_referrals_count or 0
+            "total_earnings_count": stats.total_earnings_count or 0,
+            "total_amount": stats.total_amount or Decimal(0),
+            "total_original_amount": stats.total_original_amount or Decimal(0),
+            "active_referrals_count": stats.active_referrals_count or 0,
         }
 
 
@@ -433,6 +450,7 @@ async def get_one_referral_earning(earning_id: int) -> dict | None:
 
 
 # --- Cached versions ---
+
 
 @async_cached(ttl=600, key_prefix="user")
 async def check_user_cached(telegram_id: int | str):
@@ -487,7 +505,7 @@ async def invalidate_user_cache(user_id: int):
         await cache.invalidate_pattern(f"user_items:{user_id}:*")
 
 
-async def invalidate_item_cache(item_name: str, category_name: str = None):
+async def invalidate_item_cache(item_name: str, category_name: str | None = None):
     """Invalidate product cache"""
     cache = get_cache_manager()
     if cache:
@@ -519,6 +537,7 @@ async def invalidate_stats_cache():
 
 # --- Promo codes ---
 
+
 async def get_promo_code(code: str) -> dict | None:
     """Return promo code by code string, or None."""
     async with Database().session() as s:
@@ -527,17 +546,13 @@ async def get_promo_code(code: str) -> dict | None:
         return _obj_to_dict(obj, PromoCodes) if obj else None
 
 
-async def validate_promo_for_item(
-    code: str, item_name: str, user_id: int
-) -> tuple[bool, str, dict]:
+async def validate_promo_for_item(code: str, item_name: str, user_id: int) -> tuple[bool, str, dict]:
     """
     Validate a promo code for a specific item and user.
     Returns (valid, error_key, promo_dict).
     """
     async with Database().session() as s:
-        promo = (await s.execute(
-            select(PromoCodes).where(PromoCodes.code == code.upper())
-        )).scalars().first()
+        promo = (await s.execute(select(PromoCodes).where(PromoCodes.code == code.upper()))).scalars().first()
 
         if not promo:
             return False, "promo.not_found", {}
@@ -546,35 +561,31 @@ async def validate_promo_for_item(
         if promo.discount_type == "balance":
             return False, "promo.not_balance_type", {}
 
-        from datetime import datetime, timezone
-        if promo.expires_at and promo.expires_at < datetime.now(timezone.utc):
+        from datetime import datetime
+
+        if promo.expires_at and promo.expires_at < datetime.now(UTC):
             return False, "promo.expired", {}
 
         if promo.max_uses > 0 and promo.current_uses >= promo.max_uses:
             return False, "promo.max_uses_reached", {}
 
         # Check per-user usage
-        used = (await s.execute(
-            select(exists().where(
-                PromoCodeUsages.promo_id == promo.id,
-                PromoCodeUsages.user_id == user_id
-            ))
-        )).scalar()
+        used = (
+            await s.execute(
+                select(exists().where(PromoCodeUsages.promo_id == promo.id, PromoCodeUsages.user_id == user_id))
+            )
+        ).scalar()
         if used:
             return False, "promo.already_used", {}
 
         # Check item/category binding
         if promo.item_id:
-            item = (await s.execute(
-                select(Goods).where(Goods.name == item_name)
-            )).scalars().first()
+            item = (await s.execute(select(Goods).where(Goods.name == item_name))).scalars().first()
             if not item or item.id != promo.item_id:
                 return False, "promo.wrong_item", {}
 
         if promo.category_id:
-            item = (await s.execute(
-                select(Goods).where(Goods.name == item_name)
-            )).scalars().first()
+            item = (await s.execute(select(Goods).where(Goods.name == item_name))).scalars().first()
             if not item or item.category_id != promo.category_id:
                 return False, "promo.wrong_category", {}
 
@@ -582,6 +593,7 @@ async def validate_promo_for_item(
 
 
 # --- Cart ---
+
 
 async def get_cart_items(user_id: int) -> list[dict]:
     """Return all cart items for user."""
@@ -595,43 +607,32 @@ async def get_cart_items(user_id: int) -> list[dict]:
 async def get_cart_count(user_id: int) -> int:
     """Return count of items in user's cart."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(func.count(CartItems.id)).where(CartItems.user_id == user_id)
-        )).scalar() or 0
+        return (await s.execute(select(func.count(CartItems.id)).where(CartItems.user_id == user_id))).scalar() or 0
 
 
 # --- Reviews ---
+
 
 @async_cached(ttl=600, key_prefix="avg_rating")
 async def get_item_avg_rating(item_name: str) -> float | None:
     """Return average rating for an item, or None if no reviews."""
     async with Database().session() as s:
-        result = (await s.execute(
-            select(func.avg(Reviews.rating)).where(Reviews.item_name == item_name)
-        )).scalar()
+        result = (await s.execute(select(func.avg(Reviews.rating)).where(Reviews.item_name == item_name))).scalar()
         return round(float(result), 1) if result else None
 
 
 async def has_purchased_item(user_id: int, item_name: str) -> bool:
     """Check if user has purchased an item."""
     async with Database().session() as s:
-        return (await s.execute(
-            select(exists().where(
-                BoughtGoods.buyer_id == user_id,
-                BoughtGoods.item_name == item_name
-            ))
-        )).scalar()
+        return (
+            await s.execute(select(exists().where(BoughtGoods.buyer_id == user_id, BoughtGoods.item_name == item_name)))
+        ).scalar()
 
 
 async def get_user_review(user_id: int, item_name: str) -> dict | None:
     """Return user's review for an item, or None."""
     async with Database().session() as s:
-        result = await s.execute(
-            select(Reviews).where(
-                Reviews.user_id == user_id,
-                Reviews.item_name == item_name
-            )
-        )
+        result = await s.execute(select(Reviews).where(Reviews.user_id == user_id, Reviews.item_name == item_name))
         obj = result.scalars().first()
         return _obj_to_dict(obj, Reviews) if obj else None
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from functools import lru_cache
 from typing import Any
 
-from bot.misc import EnvKeys
-from .strings import TRANSLATIONS, DEFAULT_LOCALE
 from bot.logger_mesh import logger
+from bot.misc import EnvKeys
+
+from .strings import DEFAULT_LOCALE, TRANSLATIONS
 
 
 @lru_cache(maxsize=1)

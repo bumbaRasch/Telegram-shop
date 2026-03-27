@@ -1,10 +1,11 @@
-from sqlalchemy import func, select, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, select
 
-from bot.database.methods.read import invalidate_item_cache, invalidate_category_cache
-from bot.database.methods.cache_utils import safe_create_task
-from bot.database.models import Database, Goods, ItemValues, Categories, Role, User
-from bot.database.models.main import PromoCodes, CartItems, Reviews
 from bot.database.methods.audit import log_audit
+from bot.database.methods.cache_utils import safe_create_task
+from bot.database.methods.read import invalidate_category_cache, invalidate_item_cache
+from bot.database.models import Categories, Database, Goods, ItemValues, Role, User
+from bot.database.models.main import CartItems, PromoCodes, Reviews
 
 
 async def delete_item(item_name: str) -> None:
@@ -64,11 +65,11 @@ async def delete_role(role_id: int) -> tuple[bool, str | None]:
             return False, "Role not found"
         if role.default:
             return False, "Cannot delete the default role"
-        if role.name in ('USER', 'ADMIN', 'OWNER'):
+        if role.name in ("USER", "ADMIN", "OWNER"):
             return False, "Cannot delete built-in roles"
-        user_count = (await s.execute(
-            select(func.count(User.telegram_id)).where(User.role_id == role_id)
-        )).scalar() or 0
+        user_count = (
+            await s.execute(select(func.count(User.telegram_id)).where(User.role_id == role_id))
+        ).scalar() or 0
         if user_count > 0:
             return False, f"Role has {user_count} users assigned"
         await s.delete(role)
@@ -86,7 +87,7 @@ async def delete_promo_code(promo_id: int) -> bool:
         return False
 
 
-async def remove_from_cart(cart_item_id: int, user_id: int = None) -> bool:
+async def remove_from_cart(cart_item_id: int, user_id: int | None = None) -> bool:
     """Remove a single item from cart by CartItems ID."""
     async with Database().session() as s:
         clause = CartItems.id == cart_item_id
@@ -101,7 +102,6 @@ async def clear_cart(user_id: int) -> int:
     async with Database().session() as s:
         result = await s.execute(sa_delete(CartItems).where(CartItems.user_id == user_id))
         return result.rowcount
-
 
 
 async def delete_review(review_id: int) -> bool:

@@ -1,46 +1,55 @@
 from decimal import Decimal
 from functools import partial
 
-from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import CallbackQuery, Message
 
 from bot.database.methods import (
-    get_bought_item_info, check_value, query_categories, query_user_bought_items, get_item_info_cached,
-    select_item_values_amount_cached
+    check_value,
+    get_bought_item_info,
+    get_item_info_cached,
+    query_categories,
+    query_user_bought_items,
+    select_item_values_amount_cached,
 )
-from bot.database.methods.read import (
-    get_item_avg_rating, has_purchased_item, validate_promo_for_item,
-    get_user_review, invalidate_rating_cache, get_item_info,
-)
+from bot.database.methods.audit import log_audit
 from bot.database.methods.create import create_review
 from bot.database.methods.lazy_queries import query_item_reviews
+from bot.database.methods.read import (
+    get_item_avg_rating,
+    get_user_review,
+    has_purchased_item,
+    invalidate_rating_cache,
+    validate_promo_for_item,
+)
 from bot.database.methods.transactions import redeem_balance_promo
-from bot.database.methods.audit import log_audit
-from bot.keyboards import item_info, back, lazy_paginated_keyboard
-from bot.keyboards.inline import simple_buttons, rating_keyboard
+from bot.handlers.user._helpers import edit_msg
 from bot.i18n import localize
+from bot.keyboards import back, item_info, lazy_paginated_keyboard
+from bot.keyboards.inline import rating_keyboard, simple_buttons
 from bot.misc import EnvKeys, LazyPaginator, sanitize_html
 from bot.misc.metrics import get_metrics
 from bot.states import ShopStates
-from bot.states.review_state import ReviewFSM
 from bot.states.promo_state import PromoFSM
-from bot.handlers.user._helpers import edit_msg
+from bot.states.review_state import ReviewFSM
 
 router = Router()
 
 
 # --- Shared helper: render item page ---
 
-async def _render_item_page(target, state: FSMContext, item_name: str, back_data: str = None, user_id: int = None):
+
+async def _render_item_page(
+    target, state: FSMContext, item_name: str, back_data: str | None = None, user_id: int | None = None
+):
     """
     Render the item detail page with optional promo discount.
     `target` can be CallbackQuery or Message.
     """
     data = await state.get_data()
     if not back_data:
-        back_data = data.get('item_back_data', 'gp_0')
+        back_data = data.get("item_back_data", "gp_0")
 
     item_info_data = await get_item_info_cached(item_name)
     if not item_info_data:
@@ -68,29 +77,34 @@ async def _render_item_page(target, state: FSMContext, item_name: str, back_data
         if user_id:
             purchased = await has_purchased_item(user_id, item_name)
 
-    applied_promo = data.get('applied_promo')
+    applied_promo = data.get("applied_promo")
 
     # Build price line
     price = Decimal(str(item_info_data["price"]))
     if applied_promo:
-        promo_data = data.get('applied_promo_data', {})
-        if promo_data.get('discount_type') == 'percent':
-            discount = price * Decimal(str(promo_data.get('discount_value', 0))) / 100
+        promo_data = data.get("applied_promo_data", {})
+        if promo_data.get("discount_type") == "percent":
+            discount = price * Decimal(str(promo_data.get("discount_value", 0))) / 100
         else:
-            discount = min(Decimal(str(promo_data.get('discount_value', 0))), price)
+            discount = min(Decimal(str(promo_data.get("discount_value", 0))), price)
         discounted = (price - discount).quantize(Decimal("0.01"))
         price_line = localize(
             "shop.item.price_discounted",
-            original=price, discounted=discounted,
-            currency=EnvKeys.PAY_CURRENCY, code=applied_promo,
+            original=price,
+            discounted=discounted,
+            currency=EnvKeys.PAY_CURRENCY,
+            code=applied_promo,
         )
     else:
         price_line = localize("shop.item.price", amount=price, currency=EnvKeys.PAY_CURRENCY)
 
     markup = item_info(
-        item_name, back_data,
-        avg_rating=avg_rating, review_count=review_count_val,
-        has_purchased=purchased, applied_promo=applied_promo,
+        item_name,
+        back_data,
+        avg_rating=avg_rating,
+        review_count=review_count_val,
+        has_purchased=purchased,
+        applied_promo=applied_promo,
         reviews_enabled=reviews_enabled,
     )
 
@@ -107,13 +121,14 @@ async def _render_item_page(target, state: FSMContext, item_name: str, back_data
 
     text = "\n".join(text_lines)
 
-    if hasattr(target, 'message'):
+    if hasattr(target, "message"):
         await edit_msg(target.message, text, markup)
     else:
         await target.answer(text, reply_markup=markup)
 
 
 # --- Shop / categories / items ---
+
 
 @router.callback_query(F.data == "shop")
 async def shop_callback_handler(call: CallbackQuery, state: FSMContext):
@@ -148,22 +163,18 @@ async def shop_callback_handler(call: CallbackQuery, state: FSMContext):
     await state.set_state(ShopStates.viewing_categories)
 
 
-@router.callback_query(F.data.startswith('categories-page_'))
+@router.callback_query(F.data.startswith("categories-page_"))
 async def navigate_categories(call: CallbackQuery, state: FSMContext):
     """
     Pagination across shop categories with cache.
     """
-    parts = call.data.split('_', 1)
+    parts = call.data.split("_", 1)
     page = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
 
     data = await state.get_data()
-    paginator_state = data.get('categories_paginator')
+    paginator_state = data.get("categories_paginator")
 
-    paginator = LazyPaginator(
-        query_categories,
-        per_page=10,
-        state=paginator_state
-    )
+    paginator = LazyPaginator(query_categories, per_page=10, state=paginator_state)
 
     # Pre-fetch page items to build index map and store in state
     page_items = await paginator.get_page(page)
@@ -175,10 +186,10 @@ async def navigate_categories(call: CallbackQuery, state: FSMContext):
         item_callback=lambda cat: f"cat:{items_index[cat]}:{page}",
         page=page,
         back_cb="back_to_menu",
-        nav_cb_prefix="categories-page_"
+        nav_cb_prefix="categories-page_",
     )
 
-    await edit_msg(call.message, localize('shop.categories.title'), markup)
+    await edit_msg(call.message, localize("shop.categories.title"), markup)
 
     await state.update_data(
         categories_paginator=paginator.get_state(),
@@ -186,18 +197,18 @@ async def navigate_categories(call: CallbackQuery, state: FSMContext):
     )
 
 
-@router.callback_query(F.data.startswith('cat:'))
+@router.callback_query(F.data.startswith("cat:"))
 async def items_list_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     Show items of selected category.
     Parse index and page from cat:{index}:{page}, look up category name from state.
     """
-    parts = call.data.split(':')
+    parts = call.data.split(":")
     idx = int(parts[1])
     cat_page = int(parts[2]) if len(parts) > 2 else 0
 
     data = await state.get_data()
-    category_page_items = data.get('category_page_items', [])
+    category_page_items = data.get("category_page_items", [])
 
     if idx < 0 or idx >= len(category_page_items):
         await call.answer(localize("shop.item.not_found"), show_alert=True)
@@ -234,7 +245,7 @@ async def items_list_callback_handler(call: CallbackQuery, state: FSMContext):
     await state.set_state(ShopStates.viewing_goods)
 
 
-@router.callback_query(F.data.startswith('gp_'), ShopStates.viewing_goods)
+@router.callback_query(F.data.startswith("gp_"), ShopStates.viewing_goods)
 async def navigate_goods(call: CallbackQuery, state: FSMContext):
     """
     Pagination for items inside selected category.
@@ -243,10 +254,10 @@ async def navigate_goods(call: CallbackQuery, state: FSMContext):
     current_index = int(call.data[3:])
 
     data = await state.get_data()
-    paginator_state = data.get('goods_paginator')
-    category_name = data.get('current_category', '')
+    paginator_state = data.get("goods_paginator")
+    category_name = data.get("current_category", "")
 
-    categories_page = data.get('categories_last_viewed_page', 0)
+    categories_page = data.get("categories_last_viewed_page", 0)
     back_data = f"categories-page_{categories_page}"
 
     from bot.database.methods.lazy_queries import query_items_in_category
@@ -275,18 +286,18 @@ async def navigate_goods(call: CallbackQuery, state: FSMContext):
     )
 
 
-@router.callback_query(F.data.startswith('itm:'))
+@router.callback_query(F.data.startswith("itm:"))
 async def item_info_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     Show detailed information about the item.
     Format: itm:{index}:{page}
     """
-    parts = call.data.split(':')
+    parts = call.data.split(":")
     idx = int(parts[1])
     goods_page = int(parts[2]) if len(parts) > 2 else 0
 
     data = await state.get_data()
-    goods_page_items = data.get('goods_page_items', [])
+    goods_page_items = data.get("goods_page_items", [])
 
     if idx < 0 or idx >= len(goods_page_items):
         await call.answer(localize("shop.item.not_found"), show_alert=True)
@@ -305,8 +316,8 @@ async def item_info_callback_handler(call: CallbackQuery, state: FSMContext):
     await _render_item_page(call, state, item_name, back_data, user_id=call.from_user.id)
 
 
-
 # --- Promo Code Application ---
+
 
 @router.callback_query(F.data == "apply_promo")
 async def apply_promo_handler(call: CallbackQuery, state: FSMContext):
@@ -318,7 +329,7 @@ async def apply_promo_handler(call: CallbackQuery, state: FSMContext):
 async def remove_promo_handler(call: CallbackQuery, state: FSMContext):
     await state.update_data(applied_promo=None, applied_promo_data=None)
     data = await state.get_data()
-    item_name = data.get('csrf_item')
+    item_name = data.get("csrf_item")
     if item_name:
         await _render_item_page(call, state, item_name, user_id=call.from_user.id)
     else:
@@ -329,7 +340,7 @@ async def remove_promo_handler(call: CallbackQuery, state: FSMContext):
 async def back_to_item_handler(call: CallbackQuery, state: FSMContext):
     """Return to item page, cancelling promo input if active."""
     data = await state.get_data()
-    item_name = data.get('csrf_item')
+    item_name = data.get("csrf_item")
     if not item_name:
         await edit_msg(call.message, localize("shop.item.not_found"), back("back_to_menu"))
         return
@@ -338,6 +349,7 @@ async def back_to_item_handler(call: CallbackQuery, state: FSMContext):
 
 
 # --- Balance Promo Redemption (from profile) ---
+
 
 @router.callback_query(F.data == "redeem_promo")
 async def redeem_promo_handler(call: CallbackQuery, state: FSMContext):
@@ -356,8 +368,10 @@ async def redeem_promo_code_handler(message: Message, state: FSMContext):
             reply_markup=back("profile"),
         )
         await log_audit(
-            "promo_redeem", user_id=message.from_user.id,
-            resource_type="PromoCode", resource_id=code,
+            "promo_redeem",
+            user_id=message.from_user.id,
+            resource_type="PromoCode",
+            resource_id=code,
         )
     else:
         await message.answer(localize(error_key), reply_markup=back("profile"))
@@ -366,6 +380,7 @@ async def redeem_promo_code_handler(message: Message, state: FSMContext):
 
 
 # --- Review Handlers ---
+
 
 @router.callback_query(F.data.startswith("review:"))
 async def start_review_handler(call: CallbackQuery, state: FSMContext):
@@ -408,8 +423,8 @@ async def receive_rating_handler(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "skip_review_text", ReviewFSM.waiting_text)
 async def skip_review_text_handler(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    item_name = data.get('review_item_name')
-    rating = data.get('review_rating')
+    item_name = data.get("review_item_name")
+    rating = data.get("review_rating")
 
     await create_review(call.from_user.id, item_name, rating)
     await invalidate_rating_cache(item_name)
@@ -420,8 +435,8 @@ async def skip_review_text_handler(call: CallbackQuery, state: FSMContext):
 @router.message(ReviewFSM.waiting_text, F.text)
 async def receive_review_text_handler(message: Message, state: FSMContext):
     data = await state.get_data()
-    item_name = data.get('review_item_name')
-    rating = data.get('review_rating')
+    item_name = data.get("review_item_name")
+    rating = data.get("review_rating")
     text = (message.text or "")[:500].strip()
 
     await create_review(message.from_user.id, item_name, rating, text)
@@ -432,11 +447,12 @@ async def receive_review_text_handler(message: Message, state: FSMContext):
 
 # --- Promo code text input (FSM-scoped: only active when waiting_item_promo state is set) ---
 
+
 @router.message(PromoFSM.waiting_item_promo, F.text)
 async def promo_code_text_handler(message: Message, state: FSMContext):
     """Handle promo code text input for item purchase."""
     data = await state.get_data()
-    item_name = data.get('csrf_item')
+    item_name = data.get("csrf_item")
     if not item_name:
         await state.set_state(None)
         return
@@ -452,8 +468,8 @@ async def promo_code_text_handler(message: Message, state: FSMContext):
     await state.update_data(
         applied_promo=code,
         applied_promo_data={
-            'discount_type': promo_data.get('discount_type'),
-            'discount_value': str(promo_data.get('discount_value', 0)),
+            "discount_type": promo_data.get("discount_type"),
+            "discount_value": str(promo_data.get("discount_value", 0)),
         },
     )
     await state.set_state(None)
@@ -463,6 +479,7 @@ async def promo_code_text_handler(message: Message, state: FSMContext):
 
 
 # --- View Reviews ---
+
 
 @router.callback_query(F.data.startswith("reviews:"))
 async def view_reviews_handler(call: CallbackQuery, state: FSMContext):
@@ -488,14 +505,15 @@ async def view_reviews_handler(call: CallbackQuery, state: FSMContext):
 
     lines = [localize("review.list_title", name=item_name), ""]
     for r in reviews:
-        if r.get('text'):
-            lines.append(localize("review.item", rating=r['rating'], text=r['text'][:100]))
+        if r.get("text"):
+            lines.append(localize("review.item", rating=r["rating"], text=r["text"][:100]))
         else:
-            lines.append(localize("review.item_no_text", rating=r['rating']))
+            lines.append(localize("review.item_no_text", rating=r["rating"]))
 
     # Navigation
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.types import InlineKeyboardButton
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
     kb = InlineKeyboardBuilder()
     nav_buttons = []
     if page > 0:
@@ -512,6 +530,7 @@ async def view_reviews_handler(call: CallbackQuery, state: FSMContext):
 
 
 # --- Bought items ---
+
 
 @router.callback_query(F.data == "bought_items")
 async def bought_items_callback_handler(call: CallbackQuery, state: FSMContext):
@@ -530,7 +549,7 @@ async def bought_items_callback_handler(call: CallbackQuery, state: FSMContext):
         item_callback=lambda item: f"bought-item:{item.id}:bought-goods-page_user_0",
         page=0,
         back_cb="profile",
-        nav_cb_prefix="bought-goods-page_user_"
+        nav_cb_prefix="bought-goods-page_user_",
     )
 
     await edit_msg(call.message, localize("purchases.title"), markup)
@@ -539,13 +558,13 @@ async def bought_items_callback_handler(call: CallbackQuery, state: FSMContext):
     await state.update_data(bought_items_paginator=paginator.get_state())
 
 
-@router.callback_query(F.data.startswith('bought-goods-page_'))
+@router.callback_query(F.data.startswith("bought-goods-page_"))
 async def navigate_bought_items(call: CallbackQuery, state: FSMContext):
     """
     Pagination for user's purchased items with lazy loading.
     Format: 'bought-goods-page_{data}_{page}', where data = 'user' or user_id.
     """
-    parts = call.data.split('_')
+    parts = call.data.split("_")
     if len(parts) < 3:
         await call.answer(localize("purchases.pagination.invalid"))
         return
@@ -556,18 +575,18 @@ async def navigate_bought_items(call: CallbackQuery, state: FSMContext):
     except ValueError:
         current_index = 0
 
-    if data_type == 'user':
+    if data_type == "user":
         user_id = call.from_user.id
-        back_cb = 'profile'
-        pre_back = f'bought-goods-page_user_{current_index}'
+        back_cb = "profile"
+        pre_back = f"bought-goods-page_user_{current_index}"
     else:
         user_id = int(data_type)
-        back_cb = f'check-user_{data_type}'
-        pre_back = f'bought-goods-page_{data_type}_{current_index}'
+        back_cb = f"check-user_{data_type}"
+        pre_back = f"bought-goods-page_{data_type}_{current_index}"
 
     # Get saved state
     data = await state.get_data()
-    paginator_state = data.get('bought_items_paginator')
+    paginator_state = data.get("bought_items_paginator")
 
     # Create paginator with cached state
     query_func = partial(query_user_bought_items, user_id)
@@ -579,7 +598,7 @@ async def navigate_bought_items(call: CallbackQuery, state: FSMContext):
         item_callback=lambda item: f"bought-item:{item.id}:{pre_back}",
         page=current_index,
         back_cb=back_cb,
-        nav_cb_prefix=f"bought-goods-page_{data_type}_"
+        nav_cb_prefix=f"bought-goods-page_{data_type}_",
     )
 
     await edit_msg(call.message, localize("purchases.title"), markup)
@@ -588,22 +607,24 @@ async def navigate_bought_items(call: CallbackQuery, state: FSMContext):
     await state.update_data(bought_items_paginator=paginator.get_state())
 
 
-@router.callback_query(F.data.startswith('bought-item:'))
+@router.callback_query(F.data.startswith("bought-item:"))
 async def bought_item_info_callback_handler(call: CallbackQuery):
     """
     Show details for a purchased item.
     """
-    trash, item_id, back_data = call.data.split(':', 2)
+    _, item_id, back_data = call.data.split(":", 2)
     item = await get_bought_item_info(int(item_id))
     if not item:
         await call.answer(localize("purchases.item.not_found"), show_alert=True)
         return
 
-    text = "\n".join([
-        localize("purchases.item.name", name=item["item_name"]),
-        localize("purchases.item.price", amount=item["price"], currency=EnvKeys.PAY_CURRENCY),
-        localize("purchases.item.datetime", dt=item["bought_datetime"]),
-        localize("purchases.item.unique_id", uid=item["unique_id"]),
-        localize("purchases.item.value", value=item["value"]),
-    ])
-    await edit_msg(call.message, text, back(back_data), parse_mode='HTML')
+    text = "\n".join(
+        [
+            localize("purchases.item.name", name=item["item_name"]),
+            localize("purchases.item.price", amount=item["price"], currency=EnvKeys.PAY_CURRENCY),
+            localize("purchases.item.datetime", dt=item["bought_datetime"]),
+            localize("purchases.item.unique_id", uid=item["unique_id"]),
+            localize("purchases.item.value", value=item["value"]),
+        ]
+    )
+    await edit_msg(call.message, text, back(back_data), parse_mode="HTML")

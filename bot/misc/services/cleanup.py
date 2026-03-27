@@ -1,9 +1,11 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone, time as dt_time
+from datetime import UTC, datetime, timedelta
+from datetime import time as dt_time
 
-from sqlalchemy import delete, select, func
-from bot.constants import PAYMENT_STATUS_PENDING, PAYMENT_STATUS_FAILED
+from sqlalchemy import delete
+
+from bot.constants import PAYMENT_STATUS_FAILED, PAYMENT_STATUS_PENDING
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +42,8 @@ class CleanupManager:
     async def daily_cleanup(self):
         while self.running:
             # Wait until 4:00 UTC
-            now = datetime.now(timezone.utc)
-            target = datetime.combine(now.date(), dt_time(4, 0), tzinfo=timezone.utc)
+            now = datetime.now(UTC)
+            target = datetime.combine(now.date(), dt_time(4, 0), tzinfo=UTC)
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
@@ -49,32 +51,29 @@ class CleanupManager:
 
             try:
                 from bot.database import Database
+                from bot.database.methods.audit import log_audit
                 from bot.database.models.main import AuditLog, Payments
                 from bot.misc.env import EnvKeys
-                from bot.database.methods.audit import log_audit
 
-                audit_cutoff = datetime.now(timezone.utc) - timedelta(days=EnvKeys.AUDIT_RETENTION_DAYS)
-                payments_cutoff = datetime.now(timezone.utc) - timedelta(days=EnvKeys.PAYMENTS_RETENTION_DAYS)
+                audit_cutoff = datetime.now(UTC) - timedelta(days=EnvKeys.AUDIT_RETENTION_DAYS)
+                payments_cutoff = datetime.now(UTC) - timedelta(days=EnvKeys.PAYMENTS_RETENTION_DAYS)
 
                 async with Database().session() as s:
                     # 1. Delete old audit_log entries
-                    audit_result = await s.execute(
-                        delete(AuditLog).where(AuditLog.timestamp < audit_cutoff)
-                    )
+                    audit_result = await s.execute(delete(AuditLog).where(AuditLog.timestamp < audit_cutoff))
                     audit_deleted = audit_result.rowcount
 
                     # 2. Delete old pending/failed payments
                     payments_result = await s.execute(
                         delete(Payments).where(
                             Payments.status.in_([PAYMENT_STATUS_PENDING, PAYMENT_STATUS_FAILED]),
-                            Payments.created_at < payments_cutoff
+                            Payments.created_at < payments_cutoff,
                         )
                     )
                     payments_deleted = payments_result.rowcount
 
                 await log_audit(
-                    "daily_cleanup",
-                    details=f"audit_deleted={audit_deleted}, payments_deleted={payments_deleted}"
+                    "daily_cleanup", details=f"audit_deleted={audit_deleted}, payments_deleted={payments_deleted}"
                 )
                 logger.info(f"Daily cleanup: audit={audit_deleted}, payments={payments_deleted}")
 

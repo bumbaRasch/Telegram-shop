@@ -1,24 +1,25 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
+from bot.database.methods import check_role_cached
+from bot.database.methods.audit import log_audit
+from bot.database.models import Permission
+from bot.filters import HasPermissionFilter
+from bot.handlers.user._helpers import ADMIN_PHOTO_PATH, edit_media_msg, edit_msg
 from bot.i18n import localize
 from bot.keyboards import admin_console_keyboard
-from bot.database.methods import check_role_cached
-from bot.filters import HasPermissionFilter
-from bot.database.models import Permission
-from bot.database.methods.audit import log_audit
-from bot.handlers.user._helpers import edit_media_msg, edit_msg, ADMIN_PHOTO_PATH, MENU_PHOTO_PATH
 
 router = Router()
 
 
 def _get_auth_middleware():
     from bot.main import auth_middleware
+
     return auth_middleware
 
 
-@router.callback_query(F.data == 'console')
+@router.callback_query(F.data == "console")
 async def console_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     Admin menu (only for admins and above).
@@ -40,7 +41,7 @@ async def console_callback_handler(call: CallbackQuery, state: FSMContext):
     await state.clear()
 
 
-@router.callback_query(F.data == 'toggle_maintenance', HasPermissionFilter(permission=Permission.SETTINGS_MANAGE))
+@router.callback_query(F.data == "toggle_maintenance", HasPermissionFilter(permission=Permission.SETTINGS_MANAGE))
 async def toggle_maintenance_handler(call: CallbackQuery):
     """
     Toggle maintenance mode on/off.

@@ -1,30 +1,36 @@
-from bot.handlers.user._helpers import edit_msg
 import asyncio
 from decimal import Decimal
 from functools import partial
 
-from aiogram import Router, F
+from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNotFound
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNotFound
 
-from bot.i18n import localize
-from bot.database.models import Permission
 from bot.database.methods import (
-    select_user_operations, select_user_items, check_role_name_by_id, check_user_referrals, check_user_cached,
-    get_referral_earnings_stats, get_one_referral_earning,
-    query_user_bought_items, query_user_referrals, query_referral_earnings_from_user, query_all_referral_earnings,
-    is_user_blocked, admin_balance_change
+    admin_balance_change,
+    check_role_name_by_id,
+    check_user_cached,
+    check_user_referrals,
+    get_one_referral_earning,
+    get_referral_earnings_stats,
+    is_user_blocked,
+    query_all_referral_earnings,
+    query_referral_earnings_from_user,
+    query_user_bought_items,
+    query_user_referrals,
+    select_user_items,
+    select_user_operations,
 )
-from bot.database.methods.lazy_queries import query_all_users
-from bot.keyboards import back, close, simple_buttons, lazy_paginated_keyboard
 from bot.database.methods.audit import log_audit
+from bot.database.methods.lazy_queries import query_all_users
+from bot.database.models import Permission
 from bot.filters import HasPermissionFilter
+from bot.handlers.user._helpers import edit_msg
+from bot.i18n import localize
+from bot.keyboards import back, close, lazy_paginated_keyboard, simple_buttons
+from bot.misc import EnvKeys, LazyPaginator, UserDataUpdate, validate_money_amount, validate_telegram_id
 from bot.states import UserMgmtStates
-
-import datetime
-
-from bot.misc import EnvKeys, LazyPaginator, validate_telegram_id, validate_money_amount, UserDataUpdate
 
 router = Router()
 
@@ -46,7 +52,7 @@ async def _build_user_profile(bot, target_id: int, caller_perms: int = 0):
     if not user:
         return None
 
-    fallback = user.get('first_name') or user.get('username') or str(target_id)
+    fallback = user.get("first_name") or user.get("username") or str(target_id)
 
     # Run all independent queries concurrently
     (
@@ -61,79 +67,83 @@ async def _build_user_profile(bot, target_id: int, caller_perms: int = 0):
         _safe_get_name(bot, target_id, fallback),
         select_user_operations(target_id),
         select_user_items(target_id),
-        check_role_name_by_id(user.get('role_id')),
-        check_user_referrals(user.get('telegram_id')),
+        check_role_name_by_id(user.get("role_id")),
+        check_user_referrals(user.get("telegram_id")),
         get_referral_earnings_stats(target_id),
         is_user_blocked(target_id),
     )
 
     overall_balance = sum(operations) if operations else 0
     has_referrals = referrals > 0
-    has_earnings = earnings_stats['total_earnings_count'] > 0
+    has_earnings = earnings_stats["total_earnings_count"] > 0
 
     # Action buttons
     actions: list[tuple[str, str]] = []
     role_name = role
 
-    if role_name != 'OWNER':
-        actions.append((localize('btn.admin.assign_role'), f"asr_list_{target_id}"))
+    if role_name != "OWNER":
+        actions.append((localize("btn.admin.assign_role"), f"asr_list_{target_id}"))
 
     if caller_perms & Permission.BALANCE_MANAGE:
-        actions.append((localize('btn.admin.replenish_user'), f"fill-user-balance_{target_id}"))
-        actions.append((localize('btn.admin.deduct_user'), f"deduct-user-balance_{target_id}"))
+        actions.append((localize("btn.admin.replenish_user"), f"fill-user-balance_{target_id}"))
+        actions.append((localize("btn.admin.deduct_user"), f"deduct-user-balance_{target_id}"))
 
-    if role_name != 'OWNER':
+    if role_name != "OWNER":
         if blocked:
-            actions.append((localize('btn.admin.unblock'), f"unblock-user_{target_id}"))
+            actions.append((localize("btn.admin.unblock"), f"unblock-user_{target_id}"))
         else:
-            actions.append((localize('btn.admin.block'), f"block-user_{target_id}"))
+            actions.append((localize("btn.admin.block"), f"block-user_{target_id}"))
 
     if items_count:
-        actions.append((localize('btn.purchased'), f"user-items_{target_id}"))
+        actions.append((localize("btn.purchased"), f"user-items_{target_id}"))
 
     if has_referrals:
-        actions.append((localize('admin.users.btn.view_referrals'), f"admin-view-referrals_{target_id}"))
+        actions.append((localize("admin.users.btn.view_referrals"), f"admin-view-referrals_{target_id}"))
 
     if has_earnings:
-        actions.append((localize('admin.users.btn.view_earnings'), f"admin-view-earnings_{target_id}"))
+        actions.append((localize("admin.users.btn.view_earnings"), f"admin-view-earnings_{target_id}"))
 
-    actions.append((localize('btn.back'), "user_management"))
+    actions.append((localize("btn.back"), "user_management"))
     markup = simple_buttons(actions, per_row=1)
 
     lines = [
-        localize('profile.caption', name=display_name, id=target_id),
-        '',
-        localize('profile.id', id=target_id),
-        localize('profile.balance', amount=user.get('balance'), currency=EnvKeys.PAY_CURRENCY),
-        localize('profile.total_topup', amount=overall_balance, currency=EnvKeys.PAY_CURRENCY),
-        localize('profile.purchased_count', count=items_count),
-        '',
-        localize('admin.users.referrals', count=referrals),
-        localize('admin.users.role', role=role),
-        localize('profile.registration_date', dt=user.get('registration_date')),
+        localize("profile.caption", name=display_name, id=target_id),
+        "",
+        localize("profile.id", id=target_id),
+        localize("profile.balance", amount=user.get("balance"), currency=EnvKeys.PAY_CURRENCY),
+        localize("profile.total_topup", amount=overall_balance, currency=EnvKeys.PAY_CURRENCY),
+        localize("profile.purchased_count", count=items_count),
+        "",
+        localize("admin.users.referrals", count=referrals),
+        localize("admin.users.role", role=role),
+        localize("profile.registration_date", dt=user.get("registration_date")),
     ]
 
     if blocked:
-        lines.append(localize('admin.users.status.blocked'))
+        lines.append(localize("admin.users.status.blocked"))
 
     if has_earnings:
-        lines.append('')
-        lines.append(localize('referrals.stats.template',
-                              active_count=earnings_stats['active_referrals_count'],
-                              total_earned=int(earnings_stats['total_amount']),
-                              total_original=int(earnings_stats['total_original_amount']),
-                              earnings_count=earnings_stats['total_earnings_count'],
-                              currency=EnvKeys.PAY_CURRENCY))
+        lines.append("")
+        lines.append(
+            localize(
+                "referrals.stats.template",
+                active_count=earnings_stats["active_referrals_count"],
+                total_earned=int(earnings_stats["total_amount"]),
+                total_original=int(earnings_stats["total_original_amount"]),
+                earnings_count=earnings_stats["total_earnings_count"],
+                currency=EnvKeys.PAY_CURRENCY,
+            )
+        )
 
-    return '\n'.join(lines), markup
+    return "\n".join(lines), markup
 
 
 def _user_label(u: dict) -> str:
     """Format user list button label: ID | @username  or  ID | FirstName  or just ID."""
-    tid = u['telegram_id']
-    if u.get('username'):
+    tid = u["telegram_id"]
+    if u.get("username"):
         return f"{tid} | @{u['username']}"
-    if u.get('first_name'):
+    if u.get("first_name"):
         return f"{tid} | {u['first_name']}"
     return str(tid)
 
@@ -143,7 +153,7 @@ async def _show_user_list(call: CallbackQuery, state: FSMContext, page: int):
     total = await paginator.get_total_count()
 
     if total == 0:
-        await edit_msg(call.message, localize('admin.users.prompt_enter_id'), reply_markup=back('console'))
+        await edit_msg(call.message, localize("admin.users.prompt_enter_id"), reply_markup=back("console"))
         await state.set_state(UserMgmtStates.waiting_user_id_for_check)
         return
 
@@ -168,36 +178,36 @@ async def _show_user_list(call: CallbackQuery, state: FSMContext, page: int):
     if nav:
         kb.row(*nav)
 
-    kb.row(InlineKeyboardButton(text=localize('btn.admin.search_by_id'), callback_data="user_search_by_id"))
-    kb.row(InlineKeyboardButton(text=localize('btn.back'), callback_data="console"))
+    kb.row(InlineKeyboardButton(text=localize("btn.admin.search_by_id"), callback_data="user_search_by_id"))
+    kb.row(InlineKeyboardButton(text=localize("btn.back"), callback_data="console"))
 
-    await edit_msg(call.message, localize('admin.users.list_title'), reply_markup=kb.as_markup())
+    await edit_msg(call.message, localize("admin.users.list_title"), reply_markup=kb.as_markup())
     await state.update_data(user_list_page=page)
 
 
-@router.callback_query(F.data == 'user_management', HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data == "user_management", HasPermissionFilter(Permission.USERS_MANAGE))
 async def user_callback_handler(call: CallbackQuery, state: FSMContext):
     """Show paginated list of users with search-by-ID option."""
     await state.clear()
     await _show_user_list(call, state, 0)
 
 
-@router.callback_query(F.data.startswith('users-page_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("users-page_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def users_pagination_handler(call: CallbackQuery, state: FSMContext):
     """Navigate pages of the user list."""
     try:
-        page = int(call.data.split('_')[1])
+        page = int(call.data.split("_")[1])
     except (ValueError, IndexError):
-        await call.answer(localize('errors.pagination_invalid'))
+        await call.answer(localize("errors.pagination_invalid"))
         return
     await _show_user_list(call, state, page)
 
 
-@router.callback_query(F.data == 'user_search_by_id', HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data == "user_search_by_id", HasPermissionFilter(Permission.USERS_MANAGE))
 async def user_search_by_id_handler(call: CallbackQuery, state: FSMContext):
     """Ask admin to enter a user ID manually."""
     await state.clear()
-    await edit_msg(call.message, localize('admin.users.prompt_enter_id'), reply_markup=back('user_management'))
+    await edit_msg(call.message, localize("admin.users.prompt_enter_id"), reply_markup=back("user_management"))
     await state.set_state(UserMgmtStates.waiting_user_id_for_check)
 
 
@@ -208,58 +218,54 @@ async def check_user_data(message: Message, state: FSMContext):
         target_id = validate_telegram_id(message.text.strip())
 
         from bot.database.methods import check_role_cached
+
         caller_perms = await check_role_cached(message.from_user.id) or 0
         result = await _build_user_profile(message.bot, target_id, caller_perms)
         if not result:
-            await message.answer(
-                localize('admin.users.profile_unavailable'),
-                reply_markup=back('console')
-            )
+            await message.answer(localize("admin.users.profile_unavailable"), reply_markup=back("console"))
             return
 
         text, markup = result
-        await message.answer(text, parse_mode='HTML', reply_markup=markup)
+        await message.answer(text, parse_mode="HTML", reply_markup=markup)
         await state.clear()
     except ValueError:
-        await message.answer(
-            localize('admin.users.invalid_id'),
-            reply_markup=back('console')
-        )
+        await message.answer(localize("admin.users.invalid_id"), reply_markup=back("console"))
         return
 
 
-@router.callback_query(F.data.startswith('check-user_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("check-user_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def user_profile_view(call: CallbackQuery):
     """
     Shows admin view of user profile + actions.
     """
-    user_id_str = call.data[len('check-user_'):]
+    user_id_str = call.data[len("check-user_") :]
     try:
         target_id = int(user_id_str)
     except (ValueError, TypeError):
-        await call.answer(localize('errors.invalid_data'), show_alert=True)
+        await call.answer(localize("errors.invalid_data"), show_alert=True)
         return
 
     from bot.database.methods import check_role_cached
+
     caller_perms = await check_role_cached(call.from_user.id) or 0
     result = await _build_user_profile(call.message.bot, target_id, caller_perms)
     if not result:
-        await call.answer(localize('admin.users.not_found'), show_alert=True)
+        await call.answer(localize("admin.users.not_found"), show_alert=True)
         return
 
     text, markup = result
-    await edit_msg(call.message, text, parse_mode='HTML', reply_markup=markup)
+    await edit_msg(call.message, text, parse_mode="HTML", reply_markup=markup)
 
 
-@router.callback_query(F.data.startswith('admin-view-referrals_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("admin-view-referrals_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def admin_view_referrals_handler(call: CallbackQuery, state: FSMContext):
     """
     Show a list of all referrals for selected user with lazy loading (admin view).
     """
     try:
-        user_id = int(call.data.split('_')[-1])
+        user_id = int(call.data.split("_")[-1])
     except (ValueError, IndexError):
-        await call.answer(localize('errors.invalid_data'))
+        await call.answer(localize("errors.invalid_data"))
         return
 
     # Create paginator
@@ -269,28 +275,28 @@ async def admin_view_referrals_handler(call: CallbackQuery, state: FSMContext):
     # Check if there are any referrals
     total = await paginator.get_total_count()
     if total == 0:
-        await edit_msg(call.message, 
-            localize("referrals.list.empty"),
-            reply_markup=back(f"check-user_{user_id}")
-        )
+        await edit_msg(call.message, localize("referrals.list.empty"), reply_markup=back(f"check-user_{user_id}"))
         return
 
     markup = await lazy_paginated_keyboard(
         paginator=paginator,
-        item_text=lambda referral_data: localize("referrals.item.format",
-                                                 telegram_id=referral_data['telegram_id'],
-                                                 total_earned=int(referral_data['total_earned']),
-                                                 currency=EnvKeys.PAY_CURRENCY),
+        item_text=lambda referral_data: localize(
+            "referrals.item.format",
+            telegram_id=referral_data["telegram_id"],
+            total_earned=int(referral_data["total_earned"]),
+            currency=EnvKeys.PAY_CURRENCY,
+        ),
         item_callback=lambda referral_data: f"admin-ref-earnings_{user_id}_{referral_data['telegram_id']}",
         page=0,
         back_cb=f"check-user_{user_id}",
-        nav_cb_prefix=f"admin-refs-page_{user_id}_"
+        nav_cb_prefix=f"admin-refs-page_{user_id}_",
     )
 
     name = await _safe_get_name(call.message.bot, user_id)
-    await edit_msg(call.message,
+    await edit_msg(
+        call.message,
         localize("referrals.list.title") + f"\n(<a href='tg://user?id={user_id}'>{name}</a> - {user_id})",
-        reply_markup=markup
+        reply_markup=markup,
     )
 
     # Save state
@@ -312,7 +318,7 @@ async def admin_referrals_pagination_handler(call: CallbackQuery, state: FSMCont
 
     # Get saved state
     data = await state.get_data()
-    paginator_state = data.get('admin_referrals_paginator')
+    paginator_state = data.get("admin_referrals_paginator")
 
     # Create paginator with cached state
     query_func = partial(query_user_referrals, user_id)
@@ -320,20 +326,23 @@ async def admin_referrals_pagination_handler(call: CallbackQuery, state: FSMCont
 
     markup = await lazy_paginated_keyboard(
         paginator=paginator,
-        item_text=lambda referral_data: localize("referrals.item.format",
-                                                 telegram_id=referral_data['telegram_id'],
-                                                 total_earned=int(referral_data['total_earned']),
-                                                 currency=EnvKeys.PAY_CURRENCY),
+        item_text=lambda referral_data: localize(
+            "referrals.item.format",
+            telegram_id=referral_data["telegram_id"],
+            total_earned=int(referral_data["total_earned"]),
+            currency=EnvKeys.PAY_CURRENCY,
+        ),
         item_callback=lambda referral_data: f"admin-ref-earnings_{user_id}_{referral_data['telegram_id']}",
         page=page,
         back_cb=f"check-user_{user_id}",
-        nav_cb_prefix=f"admin-refs-page_{user_id}_"
+        nav_cb_prefix=f"admin-refs-page_{user_id}_",
     )
 
     name = await _safe_get_name(call.message.bot, user_id)
-    await edit_msg(call.message,
+    await edit_msg(
+        call.message,
         localize("referrals.list.title") + f"\n(<a href='tg://user?id={user_id}'>{name}</a> - {user_id})",
-        reply_markup=markup
+        reply_markup=markup,
     )
 
     # Update state
@@ -361,23 +370,26 @@ async def admin_referral_earnings_handler(call: CallbackQuery, state: FSMContext
     total = await paginator.get_total_count()
     if total == 0:
         referral_name = await _safe_get_name(call.message.bot, referral_id)
-        await edit_msg(call.message,
+        await edit_msg(
+            call.message,
             localize("referral.earnings.empty", id=referral_id, name=referral_name),
-            reply_markup=back(f"admin-view-referrals_{user_id}")
+            reply_markup=back(f"admin-view-referrals_{user_id}"),
         )
         return
 
     markup = await lazy_paginated_keyboard(
         paginator=paginator,
-        item_text=lambda earning: localize("referral.earning.format",
-                                           amount=int(earning.amount),
-                                           currency=EnvKeys.PAY_CURRENCY,
-                                           date=earning.created_at.strftime("%d.%m.%Y %H:%M"),
-                                           original_amount=int(earning.original_amount)),
+        item_text=lambda earning: localize(
+            "referral.earning.format",
+            amount=int(earning.amount),
+            currency=EnvKeys.PAY_CURRENCY,
+            date=earning.created_at.strftime("%d.%m.%Y %H:%M"),
+            original_amount=int(earning.original_amount),
+        ),
         item_callback=lambda earning: f"admin-earning-detail:{earning.id}:admin-ref-earnings_{user_id}_{referral_id}",
         page=0,
         back_cb=f"admin-view-referrals_{user_id}",
-        nav_cb_prefix=f"admin-ref-earn_{user_id}_{referral_id}_page_"
+        nav_cb_prefix=f"admin-ref-earn_{user_id}_{referral_id}_page_",
     )
 
     referral_name = await _safe_get_name(call.message.bot, referral_id)
@@ -388,15 +400,15 @@ async def admin_referral_earnings_handler(call: CallbackQuery, state: FSMContext
     await state.update_data(admin_ref_earnings_paginator=paginator.get_state())
 
 
-@router.callback_query(F.data.startswith('admin-view-earnings_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("admin-view-earnings_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def admin_view_all_earnings_handler(call: CallbackQuery, state: FSMContext):
     """
     Show all referral earnings for selected user with lazy loading (admin view).
     """
     try:
-        user_id = int(call.data.split('_')[-1])
+        user_id = int(call.data.split("_")[-1])
     except (ValueError, IndexError):
-        await call.answer(localize('errors.invalid_data'))
+        await call.answer(localize("errors.invalid_data"))
         return
 
     # Create paginator
@@ -406,29 +418,29 @@ async def admin_view_all_earnings_handler(call: CallbackQuery, state: FSMContext
     # Check if there are any earnings
     total = await paginator.get_total_count()
     if total == 0:
-        await edit_msg(call.message, 
-            localize("all.earnings.empty"),
-            reply_markup=back(f"check-user_{user_id}")
-        )
+        await edit_msg(call.message, localize("all.earnings.empty"), reply_markup=back(f"check-user_{user_id}"))
         return
 
     markup = await lazy_paginated_keyboard(
         paginator=paginator,
-        item_text=lambda earning: localize("all.earning.format",
-                                           amount=int(earning.amount),
-                                           currency=EnvKeys.PAY_CURRENCY,
-                                           referral_id=earning.referral_id,
-                                           date=earning.created_at.strftime("%d.%m.%Y %H:%M")),
+        item_text=lambda earning: localize(
+            "all.earning.format",
+            amount=int(earning.amount),
+            currency=EnvKeys.PAY_CURRENCY,
+            referral_id=earning.referral_id,
+            date=earning.created_at.strftime("%d.%m.%Y %H:%M"),
+        ),
         item_callback=lambda earning: f"admin-earning-detail:{earning.id}:admin-view-earnings_{user_id}",
         page=0,
         back_cb=f"check-user_{user_id}",
-        nav_cb_prefix=f"admin-all-earn_{user_id}_page_"
+        nav_cb_prefix=f"admin-all-earn_{user_id}_page_",
     )
 
     name = await _safe_get_name(call.message.bot, user_id)
-    await edit_msg(call.message,
+    await edit_msg(
+        call.message,
         localize("all.earnings.title") + f"\n(<a href='tg://user?id={user_id}'>{name}</a> - {user_id})",
-        reply_markup=markup
+        reply_markup=markup,
     )
 
     # Save state
@@ -450,7 +462,7 @@ async def admin_all_earnings_pagination_handler(call: CallbackQuery, state: FSMC
 
     # Get saved state
     data = await state.get_data()
-    paginator_state = data.get('admin_all_earnings_paginator')
+    paginator_state = data.get("admin_all_earnings_paginator")
 
     # Create paginator with cached state
     query_func = partial(query_all_referral_earnings, user_id)
@@ -458,21 +470,24 @@ async def admin_all_earnings_pagination_handler(call: CallbackQuery, state: FSMC
 
     markup = await lazy_paginated_keyboard(
         paginator=paginator,
-        item_text=lambda earning: localize("all.earning.format",
-                                           amount=int(earning.amount),
-                                           currency=EnvKeys.PAY_CURRENCY,
-                                           referral_id=earning.referral_id,
-                                           date=earning.created_at.strftime("%d.%m.%Y %H:%M")),
+        item_text=lambda earning: localize(
+            "all.earning.format",
+            amount=int(earning.amount),
+            currency=EnvKeys.PAY_CURRENCY,
+            referral_id=earning.referral_id,
+            date=earning.created_at.strftime("%d.%m.%Y %H:%M"),
+        ),
         item_callback=lambda earning: f"admin-earning-detail:{earning.id}:admin-all-earn_{user_id}_page_{page}",
         page=page,
         back_cb=f"check-user_{user_id}",
-        nav_cb_prefix=f"admin-all-earn_{user_id}_page_"
+        nav_cb_prefix=f"admin-all-earn_{user_id}_page_",
     )
 
     name = await _safe_get_name(call.message.bot, user_id)
-    await edit_msg(call.message,
+    await edit_msg(
+        call.message,
         localize("all.earnings.title") + f"\n(<a href='tg://user?id={user_id}'>{name}</a> - {user_id})",
-        reply_markup=markup
+        reply_markup=markup,
     )
 
     # Update state
@@ -485,43 +500,46 @@ async def admin_earning_detail_handler(call: CallbackQuery):
     Show detailed information about specific earning (admin view).
     """
     try:
-        parts = call.data.split(':', 2)
+        parts = call.data.split(":", 2)
         earning_id = int(parts[1])
         back_data = parts[2]
     except (ValueError, IndexError):
-        await call.answer(localize('errors.invalid_data'))
+        await call.answer(localize("errors.invalid_data"))
         return
 
     earning_info = await get_one_referral_earning(earning_id)
     if not earning_info:
-        await call.answer(localize('errors.invalid_data'))
+        await call.answer(localize("errors.invalid_data"))
         return
 
-    referral_name = await _safe_get_name(call.message.bot, earning_info['referral_id'])
+    referral_name = await _safe_get_name(call.message.bot, earning_info["referral_id"])
 
-    await edit_msg(call.message,
-        localize('referral.item.info',
-                 id=earning_id,
-                 telegram_id=earning_info['referral_id'],
-                 name=referral_name,
-                 amount=earning_info['amount'],
-                 currency=EnvKeys.PAY_CURRENCY,
-                 date=earning_info['created_at'].strftime("%d.%m.%Y %H:%M"),
-                 original_amount=earning_info['original_amount']),
-        reply_markup=back(back_data)
+    await edit_msg(
+        call.message,
+        localize(
+            "referral.item.info",
+            id=earning_id,
+            telegram_id=earning_info["referral_id"],
+            name=referral_name,
+            amount=earning_info["amount"],
+            currency=EnvKeys.PAY_CURRENCY,
+            date=earning_info["created_at"].strftime("%d.%m.%Y %H:%M"),
+            original_amount=earning_info["original_amount"],
+        ),
+        reply_markup=back(back_data),
     )
 
 
-@router.callback_query(F.data.startswith('user-items_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("user-items_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def user_items_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     Shows bought items of a specific user with lazy loading.
     Callback data format: user-items_{user_id}
     """
     try:
-        user_id = int(call.data[len('user-items_'):])
+        user_id = int(call.data[len("user-items_") :])
     except (ValueError, TypeError):
-        await call.answer(localize('errors.invalid_data'), show_alert=True)
+        await call.answer(localize("errors.invalid_data"), show_alert=True)
         return
 
     # Create paginator
@@ -533,31 +551,32 @@ async def user_items_callback_handler(call: CallbackQuery, state: FSMContext):
         item_text=lambda item: item.item_name,
         item_callback=lambda item: f"bought-item:{item.id}:bought-goods-page_{user_id}_0",
         page=0,
-        back_cb=f'check-user_{user_id}',
-        nav_cb_prefix=f"bought-goods-page_{user_id}_"
+        back_cb=f"check-user_{user_id}",
+        nav_cb_prefix=f"bought-goods-page_{user_id}_",
     )
 
-    await edit_msg(call.message, localize('purchases.title'), reply_markup=markup)
+    await edit_msg(call.message, localize("purchases.title"), reply_markup=markup)
 
     # Save state for admin viewing user's items
     await state.update_data(admin_user_items_paginator=paginator.get_state())
 
 
-@router.callback_query(F.data.startswith('fill-user-balance_'), HasPermissionFilter(Permission.BALANCE_MANAGE))
+@router.callback_query(F.data.startswith("fill-user-balance_"), HasPermissionFilter(Permission.BALANCE_MANAGE))
 async def replenish_user_balance_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     Asks for amount to top up selected user's balance.
     """
-    user_data = call.data[len('fill-user-balance_'):]
+    user_data = call.data[len("fill-user-balance_") :]
     try:
         user_id = int(user_data)
     except (ValueError, TypeError):
-        await call.answer(localize('errors.invalid_data'), show_alert=True)
+        await call.answer(localize("errors.invalid_data"), show_alert=True)
         return
 
-    await edit_msg(call.message, 
-        localize('payments.replenish_prompt', currency=EnvKeys.PAY_CURRENCY),
-        reply_markup=back(f'check-user_{user_id}')
+    await edit_msg(
+        call.message,
+        localize("payments.replenish_prompt", currency=EnvKeys.PAY_CURRENCY),
+        reply_markup=back(f"check-user_{user_id}"),
     )
     await state.set_state(UserMgmtStates.waiting_user_replenish)
     await state.update_data(target_user=user_id)
@@ -567,83 +586,79 @@ async def replenish_user_balance_callback_handler(call: CallbackQuery, state: FS
 async def process_replenish_user_balance(message: Message, state: FSMContext):
     """Processes entered amount and tops up user's balance."""
     data = await state.get_data()
-    user_id = data.get('target_user')
+    user_id = data.get("target_user")
 
     try:
         # Validate amount
         amount = validate_money_amount(
-            message.text.strip(),
-            min_amount=Decimal(EnvKeys.MIN_AMOUNT),
-            max_amount=Decimal(EnvKeys.MAX_AMOUNT)
+            message.text.strip(), min_amount=Decimal(EnvKeys.MIN_AMOUNT), max_amount=Decimal(EnvKeys.MAX_AMOUNT)
         )
 
         # Validate user update
-        user_update = UserDataUpdate(
-            telegram_id=user_id,
-            balance=amount
-        )
+        user_update = UserDataUpdate(telegram_id=user_id, balance=amount)
 
         # Apply top-up (atomic: operation + balance in one transaction)
-        success, msg = await admin_balance_change(user_update.telegram_id, Decimal(int(amount)))
+        success, _ = await admin_balance_change(user_update.telegram_id, Decimal(int(amount)))
         if not success:
-            await message.answer(
-                localize('errors.something_wrong'),
-                reply_markup=back(f'check-user_{user_id}')
-            )
+            await message.answer(localize("errors.something_wrong"), reply_markup=back(f"check-user_{user_id}"))
             return
 
         target_name = await _safe_get_name(message.bot, user_id)
         await message.answer(
-            localize('admin.users.balance.topped',
-                     name=target_name,
-                     amount=int(amount),
-                     currency=EnvKeys.PAY_CURRENCY),
-            reply_markup=back(f'check-user_{user_id}')
+            localize("admin.users.balance.topped", name=target_name, amount=int(amount), currency=EnvKeys.PAY_CURRENCY),
+            reply_markup=back(f"check-user_{user_id}"),
         )
 
         # Audit logging
         admin_name = await _safe_get_name(message.bot, message.from_user.id)
-        await log_audit("balance_topup", user_id=message.from_user.id, resource_type="User", resource_id=str(user_id), details=f"admin={admin_name}, target={target_name}, amount={int(amount)}")
+        await log_audit(
+            "balance_topup",
+            user_id=message.from_user.id,
+            resource_type="User",
+            resource_id=str(user_id),
+            details=f"admin={admin_name}, target={target_name}, amount={int(amount)}",
+        )
 
         # Notify user
         try:
             await message.bot.send_message(
                 chat_id=user_id,
-                text=localize('admin.users.balance.topped.notify',
-                              amount=int(amount),
-                              currency=EnvKeys.PAY_CURRENCY),
-                reply_markup=close()
+                text=localize("admin.users.balance.topped.notify", amount=int(amount), currency=EnvKeys.PAY_CURRENCY),
+                reply_markup=close(),
             )
         except (TelegramBadRequest, TelegramForbiddenError) as e:
             await log_audit("balance_topup_notify_fail", level="ERROR", user_id=user_id, details=str(e))
 
         await state.clear()
 
-    except ValueError as e:
+    except ValueError:
         await message.answer(
-            localize('payments.replenish_invalid',
-                     min_amount=EnvKeys.MIN_AMOUNT,
-                     max_amount=EnvKeys.MAX_AMOUNT,
-                     currency=EnvKeys.PAY_CURRENCY),
-            reply_markup=back(f'check-user_{user_id}')
+            localize(
+                "payments.replenish_invalid",
+                min_amount=EnvKeys.MIN_AMOUNT,
+                max_amount=EnvKeys.MAX_AMOUNT,
+                currency=EnvKeys.PAY_CURRENCY,
+            ),
+            reply_markup=back(f"check-user_{user_id}"),
         )
 
 
-@router.callback_query(F.data.startswith('deduct-user-balance_'), HasPermissionFilter(Permission.BALANCE_MANAGE))
+@router.callback_query(F.data.startswith("deduct-user-balance_"), HasPermissionFilter(Permission.BALANCE_MANAGE))
 async def deduct_user_balance_callback_handler(call: CallbackQuery, state: FSMContext):
     """
     Asks for amount to deduct from selected user's balance.
     """
-    user_data = call.data[len('deduct-user-balance_'):]
+    user_data = call.data[len("deduct-user-balance_") :]
     try:
         user_id = int(user_data)
     except (ValueError, TypeError):
-        await call.answer(localize('errors.invalid_data'), show_alert=True)
+        await call.answer(localize("errors.invalid_data"), show_alert=True)
         return
 
-    await edit_msg(call.message, 
-        localize('payments.deduct_prompt', currency=EnvKeys.PAY_CURRENCY),
-        reply_markup=back(f'check-user_{user_id}')
+    await edit_msg(
+        call.message,
+        localize("payments.deduct_prompt", currency=EnvKeys.PAY_CURRENCY),
+        reply_markup=back(f"check-user_{user_id}"),
     )
     await state.set_state(UserMgmtStates.waiting_user_deduct)
     await state.update_data(target_user=user_id)
@@ -653,14 +668,12 @@ async def deduct_user_balance_callback_handler(call: CallbackQuery, state: FSMCo
 async def process_deduct_user_balance(message: Message, state: FSMContext):
     """Processes entered amount and deducts from user's balance."""
     data = await state.get_data()
-    user_id = data.get('target_user')
+    user_id = data.get("target_user")
 
     try:
         # Validate amount
         amount = validate_money_amount(
-            message.text.strip(),
-            min_amount=Decimal(EnvKeys.MIN_AMOUNT),
-            max_amount=Decimal(EnvKeys.MAX_AMOUNT)
+            message.text.strip(), min_amount=Decimal(EnvKeys.MIN_AMOUNT), max_amount=Decimal(EnvKeys.MAX_AMOUNT)
         )
 
         # Apply deduction (atomic: check + operation + balance in one transaction)
@@ -668,58 +681,60 @@ async def process_deduct_user_balance(message: Message, state: FSMContext):
         if not success:
             if msg == "insufficient_funds":
                 db_user = await check_user_cached(user_id)
-                current_balance = int(float(db_user.get('balance', 0))) if db_user else 0
+                current_balance = int(float(db_user.get("balance", 0))) if db_user else 0
                 await message.answer(
-                    localize('admin.users.balance.insufficient',
-                             balance=current_balance,
-                             currency=EnvKeys.PAY_CURRENCY),
-                    reply_markup=back(f'check-user_{user_id}')
+                    localize(
+                        "admin.users.balance.insufficient", balance=current_balance, currency=EnvKeys.PAY_CURRENCY
+                    ),
+                    reply_markup=back(f"check-user_{user_id}"),
                 )
             else:
-                await message.answer(
-                    localize('errors.something_wrong'),
-                    reply_markup=back(f'check-user_{user_id}')
-                )
+                await message.answer(localize("errors.something_wrong"), reply_markup=back(f"check-user_{user_id}"))
             return
 
         target_name = await _safe_get_name(message.bot, user_id)
         await message.answer(
-            localize('admin.users.balance.deducted',
-                     name=target_name,
-                     amount=int(amount),
-                     currency=EnvKeys.PAY_CURRENCY),
-            reply_markup=back(f'check-user_{user_id}')
+            localize(
+                "admin.users.balance.deducted", name=target_name, amount=int(amount), currency=EnvKeys.PAY_CURRENCY
+            ),
+            reply_markup=back(f"check-user_{user_id}"),
         )
 
         # Audit logging
         admin_name = await _safe_get_name(message.bot, message.from_user.id)
-        await log_audit("balance_deduct", user_id=message.from_user.id, resource_type="User", resource_id=str(user_id), details=f"admin={admin_name}, target={target_name}, amount={int(amount)}")
+        await log_audit(
+            "balance_deduct",
+            user_id=message.from_user.id,
+            resource_type="User",
+            resource_id=str(user_id),
+            details=f"admin={admin_name}, target={target_name}, amount={int(amount)}",
+        )
 
         # Notify user
         try:
             await message.bot.send_message(
                 chat_id=user_id,
-                text=localize('admin.users.balance.deducted.notify',
-                              amount=int(amount),
-                              currency=EnvKeys.PAY_CURRENCY),
-                reply_markup=close()
+                text=localize("admin.users.balance.deducted.notify", amount=int(amount), currency=EnvKeys.PAY_CURRENCY),
+                reply_markup=close(),
             )
         except (TelegramBadRequest, TelegramForbiddenError) as e:
             await log_audit("balance_deduct_notify_fail", level="ERROR", user_id=user_id, details=str(e))
 
         await state.clear()
 
-    except ValueError as e:
+    except ValueError:
         await message.answer(
-            localize('payments.deduct_invalid',
-                     min_amount=EnvKeys.MIN_AMOUNT,
-                     max_amount=EnvKeys.MAX_AMOUNT,
-                     currency=EnvKeys.PAY_CURRENCY),
-            reply_markup=back(f'check-user_{user_id}')
+            localize(
+                "payments.deduct_invalid",
+                min_amount=EnvKeys.MIN_AMOUNT,
+                max_amount=EnvKeys.MAX_AMOUNT,
+                currency=EnvKeys.PAY_CURRENCY,
+            ),
+            reply_markup=back(f"check-user_{user_id}"),
         )
 
 
-@router.callback_query(F.data.startswith('check-user_'), HasPermissionFilter(permission=Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("check-user_"), HasPermissionFilter(permission=Permission.USERS_MANAGE))
 async def check_user_profile_again(call: CallbackQuery):
     """
     Re-uses user_profile_view to show the profile again.
@@ -727,69 +742,85 @@ async def check_user_profile_again(call: CallbackQuery):
     await user_profile_view(call)
 
 
-@router.callback_query(F.data.startswith('block-user_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("block-user_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def block_user_handler(call: CallbackQuery):
     """
     Block a user from using the bot.
     """
-    user_id_str = call.data[len('block-user_'):]
+    user_id_str = call.data[len("block-user_") :]
     try:
         user_id = int(user_id_str)
     except (ValueError, TypeError):
-        await call.answer(localize('errors.invalid_data'), show_alert=True)
+        await call.answer(localize("errors.invalid_data"), show_alert=True)
         return
 
     db_user = await check_user_cached(user_id)
     if not db_user:
-        await call.answer(localize('admin.users.not_found'), show_alert=True)
+        await call.answer(localize("admin.users.not_found"), show_alert=True)
         return
 
-    role_name = await check_role_name_by_id(db_user.get('role_id'))
-    if role_name == 'OWNER':
-        await call.answer(localize('admin.users.cannot_block_owner'), show_alert=True)
+    role_name = await check_role_name_by_id(db_user.get("role_id"))
+    if role_name == "OWNER":
+        await call.answer(localize("admin.users.cannot_block_owner"), show_alert=True)
         return
 
     from bot.main import auth_middleware
+
     if auth_middleware:
         success = await auth_middleware.block_user(user_id)
         if not success:
-            await call.answer(localize('errors.something_wrong'), show_alert=True)
+            await call.answer(localize("errors.something_wrong"), show_alert=True)
             return
 
     target_name = await _safe_get_name(call.message.bot, user_id)
-    await edit_msg(call.message,
-        localize('admin.users.blocked.success', name=target_name),
-        reply_markup=back(f'check-user_{user_id}')
+    await edit_msg(
+        call.message,
+        localize("admin.users.blocked.success", name=target_name),
+        reply_markup=back(f"check-user_{user_id}"),
     )
 
     admin_name = await _safe_get_name(call.message.bot, call.from_user.id)
-    await log_audit("block_user", user_id=call.from_user.id, resource_type="User", resource_id=str(user_id), details=f"admin={admin_name}, target={target_name}")
+    await log_audit(
+        "block_user",
+        user_id=call.from_user.id,
+        resource_type="User",
+        resource_id=str(user_id),
+        details=f"admin={admin_name}, target={target_name}",
+    )
 
 
-@router.callback_query(F.data.startswith('unblock-user_'), HasPermissionFilter(Permission.USERS_MANAGE))
+@router.callback_query(F.data.startswith("unblock-user_"), HasPermissionFilter(Permission.USERS_MANAGE))
 async def unblock_user_handler(call: CallbackQuery):
     """
     Unblock a user.
     """
-    user_id_str = call.data[len('unblock-user_'):]
+    user_id_str = call.data[len("unblock-user_") :]
     try:
         user_id = int(user_id_str)
     except (ValueError, TypeError):
-        await call.answer(localize('errors.invalid_data'), show_alert=True)
+        await call.answer(localize("errors.invalid_data"), show_alert=True)
         return
 
     from bot.main import auth_middleware
+
     if auth_middleware:
         success = await auth_middleware.unblock_user(user_id)
         if not success:
-            await call.answer(localize('errors.something_wrong'), show_alert=True)
+            await call.answer(localize("errors.something_wrong"), show_alert=True)
             return
 
     target_name = await _safe_get_name(call.message.bot, user_id)
-    await edit_msg(call.message,
-        localize('admin.users.unblocked.success', name=target_name),
-        reply_markup=back(f'check-user_{user_id}')
+    await edit_msg(
+        call.message,
+        localize("admin.users.unblocked.success", name=target_name),
+        reply_markup=back(f"check-user_{user_id}"),
     )
 
     admin_name = await _safe_get_name(call.message.bot, call.from_user.id)
-    await log_audit("unblock_user", user_id=call.from_user.id, resource_type="User", resource_id=str(user_id), details=f"admin={admin_name}, target={target_name}")
+    await log_audit(
+        "unblock_user",
+        user_id=call.from_user.id,
+        resource_type="User",
+        resource_id=str(user_id),
+        details=f"admin={admin_name}, target={target_name}",
+    )

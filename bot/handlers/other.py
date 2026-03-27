@@ -2,19 +2,19 @@ import hashlib
 import re
 from urllib.parse import urlparse
 
-from aiogram import Router, F
-from aiogram.types import CallbackQuery
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram import F, Router
 from aiogram.enums import ChatMemberStatus
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.types import CallbackQuery
 
-from bot.misc import EnvKeys
 from bot.logger_mesh import logger
+from bot.misc import EnvKeys
 
 router = Router()
 
 
 # Close message
-@router.callback_query(F.data == 'close')
+@router.callback_query(F.data == "close")
 async def close_callback_handler(call: CallbackQuery):
     """processing of message closure (deletion)"""
     try:
@@ -23,7 +23,7 @@ async def close_callback_handler(call: CallbackQuery):
         logger.warning(f"Failed to delete message: {e}")
 
 
-@router.callback_query(F.data == 'dummy_button')
+@router.callback_query(F.data == "dummy_button")
 async def dummy_button(call: CallbackQuery):
     """“Empty” (dummy) button"""
     await call.answer("")
@@ -54,11 +54,10 @@ def _parse_channel_username() -> str | None:
     channel_url = EnvKeys.CHANNEL_URL or ""
     parsed = urlparse(channel_url)
     return (
-        parsed.path.lstrip('/')
+        parsed.path.lstrip("/")
         if parsed.path
-        else channel_url.replace("https://t.me/", "").replace("t.me/", "").lstrip('@')
+        else channel_url.replace("https://t.me/", "").replace("t.me/", "").lstrip("@")
     ) or None
-
 
 
 def generate_short_hash(text: str, length: int = 8) -> str:
@@ -73,7 +72,7 @@ def is_safe_item_name(name: str) -> bool:
         return False
 
     # Block control characters (0x00-0x1F, 0x7F) but allow all printable Unicode
-    if re.search(r'[\x00-\x1f\x7f]', name):
+    if re.search(r"[\x00-\x1f\x7f]", name):
         return False
 
     return True

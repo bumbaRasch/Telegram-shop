@@ -1,9 +1,10 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update, text
-from bot.constants import PAYMENT_STATUS_PENDING, PAYMENT_STATUS_FAILED
+from sqlalchemy import select, text, update
+
+from bot.constants import PAYMENT_STATUS_FAILED, PAYMENT_STATUS_PENDING
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +22,9 @@ class RecoveryManager:
         logger.info("Starting recovery manager...")
         self.running = True
 
-        self.recovery_tasks.append(
-            asyncio.create_task(self._safe_run(self.recover_pending_payments))
-        )
+        self.recovery_tasks.append(asyncio.create_task(self._safe_run(self.recover_pending_payments)))
 
-        self.recovery_tasks.append(
-            asyncio.create_task(self._safe_run(self.periodic_health_check))
-        )
+        self.recovery_tasks.append(asyncio.create_task(self._safe_run(self.periodic_health_check)))
 
     async def stop(self):
         """Stopping the recovery system"""
@@ -57,25 +54,27 @@ class RecoveryManager:
             try:
                 payment_copies = []
                 async with Database().session() as s:
-                    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+                    cutoff = datetime.now(UTC) - timedelta(hours=1)
                     result = await s.execute(
                         select(Payments).where(
                             Payments.status == PAYMENT_STATUS_PENDING,
                             Payments.created_at < cutoff,
-                            Payments.provider == "cryptopay"
+                            Payments.provider == "cryptopay",
                         )
                     )
                     pending_payments = result.scalars().all()
 
                     for p in pending_payments:
-                        payment_copies.append({
-                            'id': p.id,
-                            'provider': p.provider,
-                            'external_id': p.external_id,
-                            'user_id': p.user_id,
-                            'amount': p.amount,
-                            'currency': p.currency,
-                        })
+                        payment_copies.append(
+                            {
+                                "id": p.id,
+                                "provider": p.provider,
+                                "external_id": p.external_id,
+                                "user_id": p.user_id,
+                                "amount": p.amount,
+                                "currency": p.currency,
+                            }
+                        )
 
                 for pc in payment_copies:
                     await self._check_and_process_payment(pc)
@@ -92,16 +91,16 @@ class RecoveryManager:
             payment: dict with keys id, provider, external_id, user_id, amount, currency
         """
         from bot.database.methods.transactions import process_payment_with_referral
+        from bot.i18n import localize
         from bot.misc import EnvKeys
         from bot.misc.services.payment import CryptoPayAPI
-        from bot.i18n import localize
 
-        p_id = payment['id'] if isinstance(payment, dict) else payment.id
-        p_provider = payment['provider'] if isinstance(payment, dict) else payment.provider
-        p_external_id = payment['external_id'] if isinstance(payment, dict) else payment.external_id
-        p_user_id = payment['user_id'] if isinstance(payment, dict) else payment.user_id
-        p_amount = payment['amount'] if isinstance(payment, dict) else payment.amount
-        p_currency = payment['currency'] if isinstance(payment, dict) else payment.currency
+        p_id = payment["id"] if isinstance(payment, dict) else payment.id
+        p_provider = payment["provider"] if isinstance(payment, dict) else payment.provider
+        p_external_id = payment["external_id"] if isinstance(payment, dict) else payment.external_id
+        p_user_id = payment["user_id"] if isinstance(payment, dict) else payment.user_id
+        p_amount = payment["amount"] if isinstance(payment, dict) else payment.amount
+        p_currency = payment["currency"] if isinstance(payment, dict) else payment.currency
 
         try:
             if p_provider == "cryptopay" and EnvKeys.CRYPTO_PAY_TOKEN:
@@ -114,15 +113,14 @@ class RecoveryManager:
                         amount=p_amount,
                         provider=p_provider,
                         external_id=p_external_id,
-                        referral_percent=EnvKeys.REFERRAL_PERCENT
+                        referral_percent=EnvKeys.REFERRAL_PERCENT,
                     )
 
                     if success:
                         logger.info(f"Recovered payment {p_external_id}")
                         try:
                             await self.bot.send_message(
-                                p_user_id,
-                                localize("payments.topped_simple", amount=p_amount, currency=p_currency)
+                                p_user_id, localize("payments.topped_simple", amount=p_amount, currency=p_currency)
                             )
                         except Exception as e:
                             logger.error(f"Failed to notify user {p_user_id}: {e}")
@@ -139,9 +137,7 @@ class RecoveryManager:
         from bot.database.models import Payments
 
         async with Database().session() as s:
-            await s.execute(
-                update(Payments).where(Payments.id == payment_id).values(status=PAYMENT_STATUS_FAILED)
-            )
+            await s.execute(update(Payments).where(Payments.id == payment_id).values(status=PAYMENT_STATUS_FAILED))
 
     async def periodic_health_check(self):
         """Periodic system health checks"""
@@ -153,6 +149,7 @@ class RecoveryManager:
                     await s.execute(text("SELECT 1"))
 
                 from bot.misc.caching.cache import get_cache_manager
+
                 cache = get_cache_manager()
                 if cache:
                     await cache.check_health()

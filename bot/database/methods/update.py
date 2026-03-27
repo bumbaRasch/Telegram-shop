@@ -1,20 +1,22 @@
 from sqlalchemy import exc, select, update
 
-from bot.database.methods.read import invalidate_user_cache, invalidate_stats_cache, invalidate_item_cache, \
-    invalidate_category_cache
-from bot.database.methods.cache_utils import safe_create_task
-from bot.database.models import User, ItemValues, Goods, Categories, BoughtGoods, Role
-from bot.database.models.main import PromoCodes
 from bot.database import Database
+from bot.database.methods.cache_utils import safe_create_task
+from bot.database.methods.read import (
+    invalidate_category_cache,
+    invalidate_item_cache,
+    invalidate_stats_cache,
+    invalidate_user_cache,
+)
+from bot.database.models import BoughtGoods, Categories, Goods, Role, User
+from bot.database.models.main import PromoCodes
 from bot.i18n import localize
 
 
 async def set_role(telegram_id: int, role: int) -> None:
     """Set user's role (by Telegram ID) and commit."""
     async with Database().session() as s:
-        await s.execute(
-            update(User).where(User.telegram_id == telegram_id).values(role_id=role)
-        )
+        await s.execute(update(User).where(User.telegram_id == telegram_id).values(role_id=role))
 
     safe_create_task(invalidate_user_cache(telegram_id))
 
@@ -22,9 +24,7 @@ async def set_role(telegram_id: int, role: int) -> None:
 async def update_balance(telegram_id: int, summ: int) -> None:
     """Increase user's balance by `summ` and commit."""
     async with Database().session() as s:
-        await s.execute(
-            update(User).where(User.telegram_id == telegram_id).values(balance=User.balance + summ)
-        )
+        await s.execute(update(User).where(User.telegram_id == telegram_id).values(balance=User.balance + summ))
 
     safe_create_task(invalidate_user_cache(telegram_id))
     safe_create_task(invalidate_stats_cache())
@@ -36,17 +36,13 @@ async def update_item(item_name: str, new_name: str, description: str, price, ca
     """
     try:
         async with Database().session() as s:
-            result = await s.execute(
-                select(Goods).where(Goods.name == item_name).with_for_update()
-            )
+            result = await s.execute(select(Goods).where(Goods.name == item_name).with_for_update())
             goods = result.scalars().one_or_none()
 
             if not goods:
                 return False, localize("admin.goods.update.position.invalid")
 
-            cat_id = (await s.execute(
-                select(Categories.id).where(Categories.name == category)
-            )).scalar()
+            cat_id = (await s.execute(select(Categories.id).where(Categories.name == category))).scalar()
             if not cat_id:
                 return False, localize("admin.goods.update.position.invalid")
 
@@ -56,9 +52,7 @@ async def update_item(item_name: str, new_name: str, description: str, price, ca
                 goods.category_id = cat_id
                 return True, None
 
-            existing = (await s.execute(
-                select(Goods).where(Goods.name == new_name)
-            )).scalars().first()
+            existing = (await s.execute(select(Goods).where(Goods.name == new_name))).scalars().first()
             if existing:
                 return False, localize("admin.goods.update.position.exists")
 
@@ -67,9 +61,7 @@ async def update_item(item_name: str, new_name: str, description: str, price, ca
             goods.price = price
             goods.category_id = cat_id
 
-            await s.execute(
-                update(BoughtGoods).where(BoughtGoods.item_name == item_name).values(item_name=new_name)
-            )
+            await s.execute(update(BoughtGoods).where(BoughtGoods.item_name == item_name).values(item_name=new_name))
 
             safe_create_task(invalidate_item_cache(item_name, category))
             if new_name != item_name:
@@ -104,9 +96,7 @@ async def is_user_blocked(telegram_id: int) -> bool:
 async def update_category(category_name: str, new_name: str) -> None:
     """Rename a category. With integer PKs, just update the name field."""
     async with Database().session() as s:
-        result = await s.execute(
-            select(Categories).where(Categories.name == category_name).with_for_update()
-        )
+        result = await s.execute(select(Categories).where(Categories.name == category_name).with_for_update())
         category = result.scalars().one_or_none()
 
         if not category:
@@ -122,9 +112,7 @@ async def update_category(category_name: str, new_name: str) -> None:
 async def update_role(role_id: int, name: str, permissions: int) -> tuple[bool, str | None]:
     """Update role name and permissions. Returns (success, error_message)."""
     async with Database().session() as s:
-        result = await s.execute(
-            select(Role).where(Role.id == role_id).with_for_update()
-        )
+        result = await s.execute(select(Role).where(Role.id == role_id).with_for_update())
         role = result.scalars().first()
         if not role:
             return False, "Role not found"
@@ -140,9 +128,7 @@ async def update_role(role_id: int, name: str, permissions: int) -> tuple[bool, 
 async def toggle_promo_code(promo_id: int) -> bool | None:
     """Toggle promo code active status. Returns new is_active or None if not found."""
     async with Database().session() as s:
-        result = await s.execute(
-            select(PromoCodes).where(PromoCodes.id == promo_id).with_for_update()
-        )
+        result = await s.execute(select(PromoCodes).where(PromoCodes.id == promo_id).with_for_update())
         promo = result.scalars().first()
         if not promo:
             return None

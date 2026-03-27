@@ -1,17 +1,17 @@
 from decimal import Decimal
 
-from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery
 
 from bot.database.methods.create import add_to_cart
-from bot.database.methods.read import get_cart_items, get_cart_count, get_items_info_bulk
-from bot.database.methods.delete import remove_from_cart, clear_cart
+from bot.database.methods.delete import clear_cart, remove_from_cart
+from bot.database.methods.read import get_cart_count, get_cart_items, get_items_info_bulk
 from bot.database.methods.transactions import checkout_cart_transaction
+from bot.handlers.user._helpers import edit_msg
+from bot.i18n import localize
 from bot.keyboards.inline import back, simple_buttons
 from bot.misc import EnvKeys, sanitize_html
-from bot.i18n import localize
-from bot.handlers.user._helpers import edit_msg
 
 router = Router()
 
@@ -21,13 +21,14 @@ async def _resolve_promo_price(price: Decimal, promo_code: str | None) -> Decima
     if not promo_code:
         return None
     from bot.database.methods.read import get_promo_code
+
     promo = await get_promo_code(promo_code)
-    if not promo or not promo.get('is_active'):
+    if not promo or not promo.get("is_active"):
         return None
-    if promo['discount_type'] == 'percent':
-        discount = price * Decimal(str(promo['discount_value'])) / 100
+    if promo["discount_type"] == "percent":
+        discount = price * Decimal(str(promo["discount_value"])) / 100
     else:
-        discount = min(Decimal(str(promo['discount_value'])), price)
+        discount = min(Decimal(str(promo["discount_value"])), price)
     return (price - discount).quantize(Decimal("0.01"))
 
 
@@ -40,25 +41,27 @@ async def _show_cart(call: CallbackQuery):
         await edit_msg(call.message, localize("cart.title") + "\n\n" + localize("cart.empty"), back("profile"))
         return
 
-    info_map = await get_items_info_bulk([item['item_name'] for item in items])
+    info_map = await get_items_info_bulk([item["item_name"] for item in items])
     lines = [localize("cart.title"), ""]
     real_total = Decimal(0)
     has_unavailable = False
 
     for item in items:
-        info = info_map.get(item['item_name'])
+        info = info_map.get(item["item_name"])
         if not info:
-            safe_name = sanitize_html(item['item_name'])
+            safe_name = sanitize_html(item["item_name"])
             lines.append(localize("cart.unavailable_warning", name=safe_name))
             has_unavailable = True
             continue
 
-        price = Decimal(str(info['price']))
-        discounted = await _resolve_promo_price(price, item.get('promo_code'))
-        safe_name = sanitize_html(item['item_name'])
+        price = Decimal(str(info["price"]))
+        discounted = await _resolve_promo_price(price, item.get("promo_code"))
+        safe_name = sanitize_html(item["item_name"])
 
         if discounted is not None:
-            lines.append(f"🏷 <b>{safe_name}</b> — <s>{price}</s> {discounted} {EnvKeys.PAY_CURRENCY} ({item['promo_code']})")
+            lines.append(
+                f"🏷 <b>{safe_name}</b> — <s>{price}</s> {discounted} {EnvKeys.PAY_CURRENCY} ({item['promo_code']})"
+            )
             real_total += discounted
         else:
             lines.append(localize("cart.item", name=safe_name, price=price, currency=EnvKeys.PAY_CURRENCY))
@@ -81,12 +84,12 @@ async def _show_cart(call: CallbackQuery):
 @router.callback_query(F.data == "add_to_cart")
 async def add_to_cart_handler(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    item_name = data.get('csrf_item')
+    item_name = data.get("csrf_item")
     if not item_name:
         await call.answer(localize("cart.item_not_found"), show_alert=True)
         return
 
-    promo_code = data.get('applied_promo')
+    promo_code = data.get("applied_promo")
 
     success, msg = await add_to_cart(call.from_user.id, item_name, promo_code=promo_code)
     if success:
@@ -125,14 +128,14 @@ async def clear_cart_handler(call: CallbackQuery, state: FSMContext):
 async def _calc_cart_total_with_promos(user_id: int) -> Decimal:
     """Calculate real cart total considering promo codes on each item."""
     items = await get_cart_items(user_id)
-    info_map = await get_items_info_bulk([item['item_name'] for item in items])
+    info_map = await get_items_info_bulk([item["item_name"] for item in items])
     total = Decimal(0)
     for item in items:
-        info = info_map.get(item['item_name'])
+        info = info_map.get(item["item_name"])
         if not info:
             continue
-        price = Decimal(str(info['price']))
-        discounted = await _resolve_promo_price(price, item.get('promo_code'))
+        price = Decimal(str(info["price"]))
+        discounted = await _resolve_promo_price(price, item.get("promo_code"))
         total += discounted if discounted is not None else price
     return total
 
@@ -147,7 +150,11 @@ async def cart_checkout_handler(call: CallbackQuery, state: FSMContext):
         (localize("btn.yes"), "cart_checkout_confirm"),
         (localize("btn.no"), "cart"),
     ]
-    await edit_msg(call.message, localize("cart.checkout_confirm", count=count, total=total, currency=EnvKeys.PAY_CURRENCY), simple_buttons(buttons))
+    await edit_msg(
+        call.message,
+        localize("cart.checkout_confirm", count=count, total=total, currency=EnvKeys.PAY_CURRENCY),
+        simple_buttons(buttons),
+    )
 
 
 @router.callback_query(F.data == "cart_checkout_confirm")
@@ -169,9 +176,9 @@ async def cart_checkout_confirm_handler(call: CallbackQuery, state: FSMContext):
         await edit_msg(call.message, localize("cart.checkout_fail", reason=reason_map.get(msg, msg)), back("cart"))
         return
 
-    total = sum(r['price'] for r in results)
+    total = sum(r["price"] for r in results)
     username = call.from_user.username or call.from_user.first_name
-    dt = results[0]['bought_datetime'] if results else ""
+    dt = results[0]["bought_datetime"] if results else ""
 
     # Save results in state for cart_receipt back navigation
     await state.update_data(cart_receipt_results=results, cart_receipt_total=float(total))
@@ -197,6 +204,7 @@ async def cart_checkout_confirm_handler(call: CallbackQuery, state: FSMContext):
     )
 
     from bot.database.methods.audit import log_audit
+
     await log_audit(
         "cart_checkout",
         user_id=user_id,

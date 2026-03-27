@@ -22,7 +22,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn.pay.crypto": "💎 CryptoPay",
         "btn.pay.stars": "⭐ Telegram Stars",
         "btn.pay.tg": "💸 Telegram Payments",
-
         # === Admin Buttons (user management shortcuts) ===
         "btn.admin.view_profile": "👁 Посмотреть профиль",
         "btn.admin.promote": "⬆️ Назначить администратором",
@@ -31,29 +30,24 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn.admin.deduct_user": "💳 Списать с баланса",
         "btn.admin.block": "🚫 Заблокировать",
         "btn.admin.unblock": "✅ Разблокировать",
-
         # === Titles / Generic Texts ===
         "menu.title": "⛩️ Основное меню",
         "profile.caption": "👤 <b>Профиль</b> — <a href='tg://user?id={id}'>{name}</a>",
         "rules.not_set": "❌ Правила не были добавлены",
-
         # === Subscription Flow ===
         "subscribe.prompt": "Для начала подпишитесь на новостной канал",
         "subscribe.open_channel": "Открыть канал",
-
         # === Profile ===
         "profile.referral_id": "👤 <b>Реферал</b> — <code>{id}</code>",
         "btn.replenish": "💳 Пополнить баланс",
         "btn.referral": "🎲 Реферальная система",
         "btn.purchased": "🎁 Купленные товары",
-
         # === Profile Info Lines ===
         "profile.id": "🆔 <b>ID</b> — <code>{id}</code>",
         "profile.balance": "💳 <b>Баланс</b> — <code>{amount}</code> {currency}",
         "profile.total_topup": "💵 <b>Всего пополнено</b> — <code>{amount}</code> {currency}",
         "profile.purchased_count": "🎁 <b>Куплено товаров</b> — {count} шт",
         "profile.registration_date": "🕢 <b>Дата регистрации</b> — <code>{dt}</code>",
-
         # === Referral ===
         "referral.title": "💚 Реферальная система",
         "referral.link": "🔗 Ссылка: https://t.me/{bot_username}?start={user_id}",
@@ -66,24 +60,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn.view_referrals": "👥 Мои рефералы",
         "btn.view_earnings": "💰 Мои поступления",
         "btn.back_to_referral": "⬅️ К реферальной системе",
-
         "referrals.list.title": "👥 Ваши рефералы:",
         "referrals.list.empty": "У вас пока нет активных рефералов",
         "referrals.item.format": "ID: {telegram_id} | Принёс: {total_earned} {currency}",
-
         "referral.earnings.title": "💰 Поступления от реферала <code>{telegram_id}</code> (<a href='tg://user?id={telegram_id}'>{name}</a>):",
         "referral.earnings.empty": "От данного реферала <code>{id}</code> (<a href='tg://user?id={id}'>{name}</a>) пока не было поступлений",
         "referral.earning.format": "{amount} {currency} | {date} | (с {original_amount} {currency})",
-        "referral.item.info": ("💰 Поступление номер: <code>{id}</code>\n"
-                               "👤 Реферал: <code>{telegram_id}</code> (<a href='tg://user?id={telegram_id}'>{name}</a>)\n"
-                               "🔢 Количество: {amount} {currency}\n"
-                               "🕘 Дата: <code>{date}</code>\n"
-                               "💵 С пополнения на {original_amount} {currency}"),
-
+        "referral.item.info": (
+            "💰 Поступление номер: <code>{id}</code>\n"
+            "👤 Реферал: <code>{telegram_id}</code> (<a href='tg://user?id={telegram_id}'>{name}</a>)\n"
+            "🔢 Количество: {amount} {currency}\n"
+            "🕘 Дата: <code>{date}</code>\n"
+            "💵 С пополнения на {original_amount} {currency}"
+        ),
         "all.earnings.title": "💰 Все ваши реферальные поступления:",
         "all.earnings.empty": "У вас пока нет реферальных поступлений",
         "all.earning.format": "{amount} {currency} от ID:{referral_id} | {date}",
-
         "referrals.stats.template": (
             "📊 Статистика реферальной системы:\n\n"
             "👥 Активных рефералов: {active_count}\n"
@@ -91,7 +83,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "📈 Общая сумма пополнений рефералов: {total_original} {currency}\n"
             "🔢 Количество начислений: {earnings_count}"
         ),
-
         # === Admin: Main Menu ===
         "admin.menu.main": "⛩️ Меню администратора",
         "admin.menu.shop": "🛒 Управление магазином",
@@ -101,7 +92,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.menu.broadcast": "📝 Рассылка",
         "admin.menu.roles": "🛡 Управление ролями",
         "admin.menu.rights": "Недостаточно прав",
-
         # === Admin: Role Management ===
         "admin.roles.list_title": "🛡 Роли системы:",
         "admin.roles.create": "➕ Создать роль",
@@ -125,7 +115,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.roles.edit_name_prompt": "Введите новое название роли (или /skip чтобы оставить текущее):",
         "btn.admin.assign_role": "🛡 Назначить роль",
         "btn.admin.search_by_id": "🔍 Поиск по ID",
-
         # === Admin: User Management ===
         "admin.users.list_title": "👥 Пользователи",
         "admin.users.prompt_enter_id": "👤 Введите id пользователя,\nчтобы посмотреть | изменить его данные",
@@ -150,14 +139,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.users.unblocked.success": "✅ Пользователь {name} разблокирован",
         "admin.users.cannot_block_owner": "❌ Невозможно заблокировать владельца",
         "admin.users.status.blocked": "🚫 <b>Статус</b> — Заблокирован",
-
         # === Admin: Shop Management Menu ===
         "admin.shop.menu.title": "⛩️ Меню управления магазином",
         "admin.shop.menu.statistics": "📊 Статистика",
         "admin.shop.menu.logs": "📁 Показать логи",
         "admin.shop.menu.users": "👤 Пользователи",
         "admin.shop.menu.search_bought": "🔎 Поиск купленного товара",
-
         # === Admin: Categories Management ===
         "admin.categories.menu.title": "⛩️ Меню управления категориями",
         "admin.categories.add": "➕ Добавить категорию",
@@ -173,8 +160,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.categories.delete.success": "✅ Категория удалена",
         "admin.categories.rename.not_found": "❌ Категория не может быть обновлена (такой категории не существует)",
         "admin.categories.rename.exist": "❌ Переименование невозможно (категория с таким именем уже существует)",
-        "admin.categories.rename.success": "✅ Категория \"{old}\" переименована в \"{new}\"",
-
+        "admin.categories.rename.success": '✅ Категория "{old}" переименована в "{new}"',
         # === Admin: Goods / Items Management (Add / List / Item Info) ===
         "admin.goods.add_position": "➕ Добавить позицию",
         "admin.goods.add_item": "➕ Добавить товар в позицию",
@@ -211,7 +197,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.item.not_found": "Товар не найден",
         "admin.goods.prompt.enter_item_name": "Введите название позиции",
         "admin.goods.menu.title": "⛩️ Меню управления позициями",
-
         # === Admin: Goods / Items Update Flow ===
         "admin.goods.update.amount.prompt.name": "Введите название позиции",
         "admin.goods.update.amount.not_exists": "❌ Товар не может быть добавлен (такой позиции не существует)",
@@ -226,7 +211,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.update.infinity.make.question": "Вы хотите сделать товары бесконечными?",
         "admin.goods.update.infinity.deny.question": "Вы хотите отменить бесконечные товары?",
         "admin.goods.update.success": "✅ Позиция обновлена",
-
         # === Admin: Goods / Items Delete Flow ===
         "admin.goods.delete.prompt.name": "Введите название позиции",
         "admin.goods.delete.position.not_found": "❌ Позиция не удалена (Такой позиции не существует)",
@@ -234,22 +218,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.item.delete.button": "❌ Удалить товар",
         "admin.goods.item.already_deleted_or_missing": "Товар уже удалён или не найден",
         "admin.goods.item.deleted": "✅ Товар удалён",
-
         # === Admin: Item Info ===
         "admin.goods.item.info.position": "<b>Позиция</b>: <code>{name}</code>",
         "admin.goods.item.info.price": "<b>Цена</b>: <code>{price}</code> {currency}",
         "admin.goods.item.info.id": "<b>Уникальный ID</b>: <code>{id}</code>",
         "admin.goods.item.info.value": "<b>Товар</b>: <code>{value}</code>",
-
         # === Admin: Logs ===
         "admin.shop.logs.caption": "Логи бота",
         "admin.shop.logs.empty": "❗️ Логов пока нет",
-
         # === Group Notifications ===
         "shop.group.new_upload": "Залив",
         "shop.group.item": "Товар",
         "shop.group.count": "Количество",
-
         # === Admin: Statistics ===
         "admin.shop.stats.template": (
             "Статистика магазина:\n"
@@ -275,7 +255,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "◾Продано: {sold_count} шт."
         ),
         "admin.shop.stats.roles_header": "\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n◽<b>РОЛИ</b>",
-
         # === Admin: Lists & Broadcast ===
         "admin.shop.users.title": "Пользователи бота:",
         "admin.shop.bought.prompt_id": "Введите уникальный ID купленного товара",
@@ -287,7 +266,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "📊 Прогресс: {progress:.1f}%\n"
             "✅ Отправлено: {sent}/{total}\n"
             "❌ Ошибок: {failed}\n"
-            "⏱ Прошло времени: {time} сек"),
+            "⏱ Прошло времени: {time} сек"
+        ),
         "broadcast.done": (
             "✅ Рассылка завершена!\n\n"
             "📊 Статистика:\n"
@@ -300,7 +280,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "broadcast.cancel": "❌ Рассылка отменена",
         "broadcast.warning": "Нет активной рассылки",
-
         # === Payments / Top-up Flow ===
         "payments.replenish_prompt": "Введите сумму пополнения в {currency}:",
         "payments.replenish_invalid": "❌ Неверная сумма. Введите число от {min_amount} до {max_amount} {currency}.",
@@ -337,7 +316,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "payments.invoice.label.stars": "{stars} ⭐️",
         "payments.already_processed": "Этот платеж уже был обработан ✅",
         "payments.processing_error": "Ошибка при обработке платежа. Попробуйте позже.",
-
         # === Shop Browsing (Categories / Goods / Item Page) ===
         "shop.categories.title": "🏪 Категории магазина",
         "shop.goods.choose": "🏪 Выберите нужный товар",
@@ -354,7 +332,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "shop.purchase.processing": "⏳ Обрабатываем покупку...",
         "shop.purchase.fail.user_not_found": "❌ Пользователь не найден в системе",
         "shop.purchase.fail.general": "❌ Ошибка при покупке: {message}",
-
         # === Purchases ===
         "purchases.title": "Купленные товары:",
         "purchases.pagination.invalid": "Некорректные данные пагинации",
@@ -365,7 +342,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "purchases.item.unique_id": "<b>🧾 Уникальный ID</b>: <code>{uid}</code>",
         "purchases.item.value": "<b>🔑 Значение</b>:\n<code>{value}</code>",
         "purchases.item.buyer": "<b>Покупатель</b>: <code>{buyer}</code>",
-
         # === Middleware ===
         "middleware.ban": "⏳ Вы временно заблокированы. Подождите {time} секунд",
         "middleware.above_limits": "⚠️ Слишком много запросов! Вы временно заблокированы.",
@@ -376,13 +352,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "middleware.security.not_admin": "⛔ Недостаточно прав",
         "middleware.security.invalid_csrf": "⚠️ Сессия устарела. Пожалуйста, попробуйте снова.",
         "maintenance.active": "🔧 Бот находится на техническом обслуживании. Пожалуйста, попробуйте позже.",
-
         # === Admin: Maintenance ===
         "admin.menu.maintenance_on": "🔧 Тех. работы: ВКЛ",
         "admin.menu.maintenance_off": "🔧 Тех. работы: ВЫКЛ",
         "admin.maintenance.enabled": "✅ Режим тех. работ включён",
         "admin.maintenance.disabled": "✅ Режим тех. работ выключён",
-
         # === Promo Codes ===
         "btn.apply_promo": "🏷 Применить промокод",
         "btn.remove_promo": "❌ Убрать промокод",
@@ -432,7 +406,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.promo.item_not_found": "❌ Товар не найден.",
         "btn.redeem_promo": "🏷 Активировать промокод",
         "review.disabled": "Отзывы отключены.",
-
         # === Cart ===
         "btn.cart": "🛒 Корзина ({count})",
         "btn.cart_empty": "🛒 Корзина",
@@ -455,8 +428,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cart.items_unavailable": "Некоторые товары более недоступны и были убраны из корзины.",
         "cart.promo_expired": "❌ Промокод истёк или больше недействителен. Оформите заказ заново.",
         "cart.unavailable_warning": "⚠️ <b>{name}</b> — товар недоступен (будет удалён при оформлении)",
-
-
         # === Operation History ===
         "btn.operation_history": "📋 История операций",
         "history.title": "📋 <b>История операций</b>",
@@ -465,7 +436,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "history.purchase": "🛒 Покупка: {amount} {currency}",
         "history.referral": "🎲 Реферальный бонус: +{amount} {currency}",
         "history.date": "📅 {date}",
-
         # === Reviews ===
         "btn.leave_review": "⭐ Оставить отзыв",
         "btn.view_reviews": "📝 Отзывы ({count})",
@@ -480,7 +450,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "review.item_no_text": "⭐ {rating}/5",
         "review.list_title": "📝 <b>Отзывы на {name}</b>",
         "review.list_empty": "Отзывов пока нет.",
-
         # === Errors ===
         "errors.not_subscribed": "Вы не подписались",
         "errors.something_wrong": "❌ Что-то пошло не так. Попробуйте ещё раз.",
@@ -492,7 +461,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "errors.channel.telegram_forbidden_error": "Канал не найден. Проверьте username канала для заливов @{channel}.",
         "errors.channel.telegram_bad_request": "Не удалось отправить в канал для заливов: {e}",
     },
-
     "en": {
         # === Common Buttons ===
         "btn.shop": "🏪 Shop",
@@ -514,7 +482,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn.pay.crypto": "💎 CryptoPay",
         "btn.pay.stars": "⭐ Telegram Stars",
         "btn.pay.tg": "💸 Telegram Payments",
-
         # === Admin Buttons (user management shortcuts) ===
         "btn.admin.view_profile": "👁 View profile",
         "btn.admin.promote": "⬆️ Make admin",
@@ -523,29 +490,24 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn.admin.deduct_user": "💳 Deduct from balance",
         "btn.admin.block": "🚫 Block",
         "btn.admin.unblock": "✅ Unblock",
-
         # === Titles / Generic Texts ===
         "menu.title": "⛩️ Main menu",
         "profile.caption": "👤 <b>Profile</b> — <a href='tg://user?id={id}'>{name}</a>",
         "rules.not_set": "❌ Rules have not been added",
-
         # === Profile ===
         "btn.replenish": "💳 Top up your balance",
         "btn.referral": "🎲 Referral system",
         "btn.purchased": "🎁 Purchased goods",
         "profile.referral_id": "👤 <b>Referral</b> — <code>{id}</code>",
-
         # === Subscription Flow ===
         "subscribe.prompt": "First, subscribe to the news channel",
         "subscribe.open_channel": "Open channel",
-
         # === Profile Info Lines ===
         "profile.id": "🆔 <b>ID</b> — <code>{id}</code>",
         "profile.balance": "💳 <b>Balance</b> — <code>{amount}</code> {currency}",
         "profile.total_topup": "💵 <b>Total topped up</b> — <code>{amount}</code> {currency}",
         "profile.purchased_count": "🎁 <b>Purchased items</b> — {count} pcs",
         "profile.registration_date": "🕢 <b>Registered at</b> — <code>{dt}</code>",
-
         # === Referral ===
         "referral.title": "💚 Referral system",
         "referral.link": "🔗 Link: https://t.me/{bot_username}?start={user_id}",
@@ -558,24 +520,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn.view_referrals": "👥 My referrals",
         "btn.view_earnings": "💰 My earnings",
         "btn.back_to_referral": "⬅️ Back to referral system",
-
         "referrals.list.title": "👥 Your referrals:",
         "referrals.list.empty": "You don't have any active referrals yet",
         "referrals.item.format": "ID: {telegram_id} | Earned: {total_earned} {currency}",
-
         "referral.earnings.title": "💰 Earnings from referral <code>{telegram_id}</code> (<a href='tg://user?id={telegram_id}'>{name}</a>):",
         "referral.earnings.empty": "No earnings from this referral <code>{id}</code> (<a href='tg://user?id={id}'>{name}</a>) yet",
         "referral.earning.format": "{amount} {currency} | {date} | (from {original_amount} {currency})",
-        "referral.item.info": ("💰 Earning number: <code>{id}</code>\n"
-                               "👤 Referral: <code>{telegram_id}</code> (<a href='tg://user?id={telegram_id}'>{name}</a>)\n"
-                               "🔢 Amount: {amount} {currency}\n"
-                               "🕘 Date: <code>{date}</code>\n"
-                               "💵 From a deposit to {original_amount} {currency}"),
-
+        "referral.item.info": (
+            "💰 Earning number: <code>{id}</code>\n"
+            "👤 Referral: <code>{telegram_id}</code> (<a href='tg://user?id={telegram_id}'>{name}</a>)\n"
+            "🔢 Amount: {amount} {currency}\n"
+            "🕘 Date: <code>{date}</code>\n"
+            "💵 From a deposit to {original_amount} {currency}"
+        ),
         "all.earnings.title": "💰 All your referral earnings:",
         "all.earnings.empty": "You have no referral earnings yet",
         "all.earning.format": "{amount} {currency} from ID:{referral_id} | {date}",
-
         "referrals.stats.template": (
             "📊 Referral system statistics:\n\n"
             "👥 Active referrals: {active_count}\n"
@@ -583,7 +543,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "📈 Total referrals top-ups: {total_original} {currency}\n"
             "🔢 Number of earnings: {earnings_count}"
         ),
-
         # === Admin: Main Menu ===
         "admin.menu.main": "⛩️ Admin Menu",
         "admin.menu.shop": "🛒 Shop management",
@@ -593,7 +552,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.menu.broadcast": "📝 Broadcast",
         "admin.menu.roles": "🛡 Role management",
         "admin.menu.rights": "Insufficient permissions",
-
         # === Admin: Role Management ===
         "admin.roles.list_title": "🛡 System roles:",
         "admin.roles.create": "➕ Create role",
@@ -603,12 +561,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.roles.prompt_name": "Enter the role name (max 64 characters):",
         "admin.roles.name_invalid": "⚠️ Invalid name (empty or exceeds 64 characters).",
         "admin.roles.name_exists": "❌ A role with this name already exists",
-        "admin.roles.select_perms": "Select permissions for role \"{name}\":",
+        "admin.roles.select_perms": 'Select permissions for role "{name}":',
         "admin.roles.confirm": "✅ Confirm",
-        "admin.roles.created": "✅ Role \"{name}\" created",
-        "admin.roles.updated": "✅ Role \"{name}\" updated",
+        "admin.roles.created": '✅ Role "{name}" created',
+        "admin.roles.updated": '✅ Role "{name}" updated',
         "admin.roles.deleted": "✅ Role deleted",
-        "admin.roles.delete_confirm": "Are you sure you want to delete the role \"{name}\"?",
+        "admin.roles.delete_confirm": 'Are you sure you want to delete the role "{name}"?',
         "admin.roles.delete_fail": "❌ Failed to delete: {error}",
         "admin.roles.perm_denied": "⚠️ Insufficient permissions for this action",
         "admin.roles.assign_prompt": "Select a role for user {id}:",
@@ -617,7 +575,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.roles.edit_name_prompt": "Enter the new role name (or /skip to keep current):",
         "btn.admin.assign_role": "🛡 Assign role",
         "btn.admin.search_by_id": "🔍 Search by ID",
-
         # === Admin: User Management ===
         "admin.users.list_title": "👥 Users",
         "admin.users.prompt_enter_id": "👤 Enter the user ID to view / edit data",
@@ -642,14 +599,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.users.unblocked.success": "✅ User {name} has been unblocked",
         "admin.users.cannot_block_owner": "❌ Cannot block the owner",
         "admin.users.status.blocked": "🚫 <b>Status</b> — Blocked",
-
         # === Admin: Shop Management Menu ===
         "admin.shop.menu.title": "⛩️ Shop management",
         "admin.shop.menu.statistics": "📊 Statistics",
         "admin.shop.menu.logs": "📁 Show logs",
         "admin.shop.menu.users": "👤 Users",
         "admin.shop.menu.search_bought": "🔎 Search purchased item",
-
         # === Admin: Categories Management ===
         "admin.categories.menu.title": "⛩️ Categories management",
         "admin.categories.add": "➕ Add category",
@@ -665,8 +620,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.categories.delete.success": "✅ Category deleted",
         "admin.categories.rename.not_found": "❌ Category cannot be updated (does not exist)",
         "admin.categories.rename.exist": "❌ Cannot rename (a category with this name already exists)",
-        "admin.categories.rename.success": "✅ Category \"{old}\" renamed to \"{new}\"",
-
+        "admin.categories.rename.success": '✅ Category "{old}" renamed to "{new}"',
         # === Admin: Goods / Items Management (Add / List / Item Info) ===
         "admin.goods.add_position": "➕ add item",
         "admin.goods.add_item": "➕ Add product to item",
@@ -682,8 +636,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.add.category.not_found": "❌ Item cannot be created (invalid category provided)",
         "admin.goods.add.infinity.question": "Should this item have infinite values? (everyone will receive the same value copy)",
         "admin.goods.add.values.prompt_multi": (
-            "Send product values one per message.\n"
-            "When finished, press “Add the listed goods”."
+            "Send product values one per message.\nWhen finished, press “Add the listed goods”."
         ),
         "admin.goods.add.values.added": "✅ Value “{value}” added to the list ({count} pcs).",
         "admin.goods.add.result.created": "✅ Item has been created.",
@@ -703,7 +656,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.item.not_found": "Item not found",
         "admin.goods.prompt.enter_item_name": "Enter the item name",
         "admin.goods.menu.title": "⛩️ Items management menu",
-
         # === Admin: Goods / Items Update Flow ===
         "admin.goods.update.amount.prompt.name": "Enter the item name",
         "admin.goods.update.amount.not_exists": "❌ Unable to add values (item does not exist)",
@@ -718,7 +670,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.update.infinity.make.question": "Do you want to make the item infinite?",
         "admin.goods.update.infinity.deny.question": "Do you want to disable infinity?",
         "admin.goods.update.success": "✅ Item updated",
-
         # === Admin: Goods / Items Delete Flow ===
         "admin.goods.delete.prompt.name": "Enter the item name",
         "admin.goods.delete.position.not_found": "❌ item not deleted (this item doesn't exist)",
@@ -726,22 +677,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.goods.item.delete.button": "❌ Delete item",
         "admin.goods.item.already_deleted_or_missing": "Item already deleted or not found",
         "admin.goods.item.deleted": "✅ Item deleted",
-
         # === Admin: Item Info ===
         "admin.goods.item.info.position": "<b>Item</b>: <code>{name}</code>",
         "admin.goods.item.info.price": "<b>Price</b>: <code>{price}</code> {currency}",
         "admin.goods.item.info.id": "<b>Unique ID</b>: <code>{id}</code>",
         "admin.goods.item.info.value": "<b>Product</b>: <code>{value}</code>",
-
         # === Admin: Logs ===
         "admin.shop.logs.caption": "Bot logs",
         "admin.shop.logs.empty": "❗️ No logs yet",
-
         # === Group Notifications ===
         "shop.group.new_upload": "New stock",
         "shop.group.item": "Item",
         "shop.group.count": "Quantity",
-
         # === Admin: Statistics ===
         "admin.shop.stats.template": (
             "Shop statistics:\n"
@@ -767,7 +714,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "◾Sold: {sold_count} pcs"
         ),
         "admin.shop.stats.roles_header": "\n➖➖➖➖➖➖➖➖➖➖➖➖➖\n◽<b>ROLES</b>",
-
         # === Admin: Lists & Broadcast ===
         "admin.shop.users.title": "Bot users:",
         "admin.shop.bought.prompt_id": "Enter purchased item unique ID",
@@ -779,7 +725,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "📊 Progress: {progress:.1f}%{n}"
             "✅ Sent: {sent}/{total}\n"
             "❌ Errors: {failed}\n"
-            "⏱ Time elapsed: {time} sec"),
+            "⏱ Time elapsed: {time} sec"
+        ),
         "broadcast.done": (
             "✅ Broadcasting is complete! \n\n"
             "📊 Statistics:📊\n"
@@ -792,7 +739,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         ),
         "broadcast.cancel": "❌ The broadcast has been canceled.",
         "broadcast.warning": "No active broadcast",
-
         # === Payments / Top-up Flow ===
         "payments.replenish_prompt": "Enter top-up amount in {currency}:",
         "payments.replenish_invalid": "❌ Invalid amount. Enter a number from {min_amount} to {max_amount} {currency}.",
@@ -829,7 +775,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "payments.invoice.label.stars": "{stars} ⭐️",
         "payments.already_processed": "This payment has already been processed ✅",
         "payments.processing_error": "Payment processing error. Please try again later.",
-
         # === Shop Browsing (Categories / Goods / Item Page) ===
         "shop.categories.title": "🏪 Shop categories",
         "shop.goods.choose": "🏪 Choose a product",
@@ -846,7 +791,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "shop.purchase.processing": "⏳ Processing the purchase...",
         "shop.purchase.fail.user_not_found": "❌ User not found in the system",
         "shop.purchase.fail.general": "❌ Purchase error: {message}",
-
         # === Purchases ===
         "purchases.title": "Purchased items:",
         "purchases.pagination.invalid": "Invalid pagination data",
@@ -857,7 +801,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "purchases.item.unique_id": "<b>🧾 Unique ID</b>: <code>{uid}</code>",
         "purchases.item.value": "<b>🔑 Value</b>:\n<code>{value}</code>",
         "purchases.item.buyer": "<b>Buyer</b>: <code>{buyer}</code>",
-
         # === Middleware ===
         "middleware.ban": "⏳ You are temporarily blocked. Wait {time} seconds.",
         "middleware.above_limits": "⚠️ Too many requests! You are temporarily blocked.",
@@ -868,13 +811,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "middleware.security.not_admin": "⛔ Insufficient permissions",
         "middleware.security.invalid_csrf": "⚠️ Session expired. Please try again.",
         "maintenance.active": "🔧 The bot is under maintenance. Please try again later.",
-
         # === Admin: Maintenance ===
         "admin.menu.maintenance_on": "🔧 Maintenance: ON",
         "admin.menu.maintenance_off": "🔧 Maintenance: OFF",
         "admin.maintenance.enabled": "✅ Maintenance mode enabled",
         "admin.maintenance.disabled": "✅ Maintenance mode disabled",
-
         # === Promo Codes ===
         "btn.apply_promo": "🏷 Apply promo code",
         "btn.remove_promo": "❌ Remove promo code",
@@ -924,7 +865,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin.promo.item_not_found": "❌ Item not found.",
         "btn.redeem_promo": "🏷 Redeem promo code",
         "review.disabled": "Reviews are disabled.",
-
         # === Cart ===
         "btn.cart": "🛒 Cart ({count})",
         "btn.cart_empty": "🛒 Cart",
@@ -947,8 +887,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cart.items_unavailable": "Some items are no longer available and were removed from cart.",
         "cart.promo_expired": "❌ Promo code expired or is no longer valid. Please retry checkout.",
         "cart.unavailable_warning": "⚠️ <b>{name}</b> — unavailable (will be removed at checkout)",
-
-
         # === Operation History ===
         "btn.operation_history": "📋 Operation History",
         "history.title": "📋 <b>Operation History</b>",
@@ -957,7 +895,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "history.purchase": "🛒 Purchase: {amount} {currency}",
         "history.referral": "🎲 Referral bonus: +{amount} {currency}",
         "history.date": "📅 {date}",
-
         # === Reviews ===
         "btn.leave_review": "⭐ Leave a review",
         "btn.view_reviews": "📝 Reviews ({count})",
@@ -972,7 +909,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "review.item_no_text": "⭐ {rating}/5",
         "review.list_title": "📝 <b>Reviews for {name}</b>",
         "review.list_empty": "No reviews yet.",
-
         # === Errors ===
         "errors.not_subscribed": "You are not subscribed",
         "errors.something_wrong": "❌ Something went wrong. Please try again.",

@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 
 from bot.misc import EnvKeys
@@ -47,12 +47,12 @@ def configure_logging(console: bool = True, debug: bool = False):
     # Disable redundant logs from aiogram
     # Show only WARNINGS and above for these components
     for name in (
-            "aiogram.client",
-            "aiogram.methods",
-            "aiogram.fsm",
-            "aiogram.event",
-            "aiogram.middlewares",
-            "aiogram.dispatcher"
+        "aiogram.client",
+        "aiogram.methods",
+        "aiogram.fsm",
+        "aiogram.event",
+        "aiogram.middlewares",
+        "aiogram.dispatcher",
     ):
         logging.getLogger(name).setLevel(logging.WARNING)
 

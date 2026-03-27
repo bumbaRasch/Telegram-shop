@@ -1,22 +1,25 @@
-from typing import Callable, Iterable, Tuple
+from collections.abc import Callable, Iterable
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from bot.i18n import localize
+
 from bot.database.models import Permission
-from bot.misc import LazyPaginator # noqa: F401
+from bot.i18n import localize
+from bot.misc import LazyPaginator
 
 
 def _parse_layout(layout: str) -> tuple[int, ...]:
     """Parse a comma-separated layout string like "1" or "2" or "1,2" into a tuple of ints."""
     try:
-        sizes = tuple(max(1, int(x.strip())) for x in layout.split(',') if x.strip())
+        sizes = tuple(max(1, int(x.strip())) for x in layout.split(",") if x.strip())
         return sizes if sizes else (1,)
     except (ValueError, TypeError):
         return (1,)
 
 
-def main_menu(role: int, channel: str | None = None, helper: str | None = None,
-              layout: str = "1") -> InlineKeyboardMarkup:
+def main_menu(
+    role: int, channel: str | None = None, helper: str | None = None, layout: str = "1"
+) -> InlineKeyboardMarkup:
     """
     Main menu. `layout` is a comma-separated row-sizes string, e.g. "1" or "2" or "1,2".
     """
@@ -78,7 +81,7 @@ def admin_console_keyboard(maintenance_mode: bool = False, role: int = 127) -> I
     return kb.as_markup()
 
 
-def simple_buttons(buttons: Iterable[Tuple[str, str]], per_row: int = 1) -> InlineKeyboardMarkup:
+def simple_buttons(buttons: Iterable[tuple[str, str]], per_row: int = 1) -> InlineKeyboardMarkup:
     """
     Universal button assembly from (text, callback_data)
     """
@@ -104,13 +107,13 @@ def close() -> InlineKeyboardMarkup:
 
 
 async def lazy_paginated_keyboard(
-        paginator: 'LazyPaginator',
-        item_text: Callable[[object], str],
-        item_callback: Callable[[object], str],
-        page: int = 0,
-        back_cb: str | None = None,
-        nav_cb_prefix: str = "",
-        back_text: str | None = None,
+    paginator: "LazyPaginator",
+    item_text: Callable[[object], str],
+    item_callback: Callable[[object], str],
+    page: int = 0,
+    back_cb: str | None = None,
+    nav_cb_prefix: str = "",
+    back_text: str | None = None,
 ) -> InlineKeyboardMarkup:
     """
     Lazy pagination keyboard with data loading on demand
@@ -142,9 +145,13 @@ async def lazy_paginated_keyboard(
 
 
 def item_info(
-        item_name: str, back_data: str, avg_rating: float = None,
-        review_count: int = 0, has_purchased: bool = False,
-        applied_promo: str = None, reviews_enabled: bool = True,
+    item_name: str,
+    back_data: str,
+    avg_rating: float | None = None,
+    review_count: int = 0,
+    has_purchased: bool = False,
+    applied_promo: str | None = None,
+    reviews_enabled: bool = True,
 ) -> InlineKeyboardMarkup:
     """
     Product card with buy, cart, promo, review buttons.

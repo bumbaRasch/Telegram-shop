@@ -2,19 +2,18 @@ import logging
 import time
 from typing import Any
 
+from markupsafe import Markup
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
+from sqlalchemy import text
 from starlette.applications import Starlette
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
-from starlette.middleware.sessions import SessionMiddleware
 from starlette.routing import Route
-from sqlalchemy import text
 
-from markupsafe import Markup
-
-from bot.misc import EnvKeys
 from bot.database.methods.audit import log_audit
+from bot.misc import EnvKeys
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +52,25 @@ class LoginRateLimiter:
 
 
 _login_limiter = LoginRateLimiter()
-from bot.database.main import Database
-from bot.database.models.main import (
-    User, Role, Categories, Goods, ItemValues,
-    BoughtGoods, Operations, Payments, ReferralEarnings,
-    AuditLog, PromoCodes, CartItems, Reviews, BotSettings,
+from bot.database.main import Database  # noqa: E402
+from bot.database.models.main import (  # noqa: E402
+    AuditLog,
+    BotSettings,
+    BoughtGoods,
+    CartItems,
+    Categories,
+    Goods,
+    ItemValues,
+    Operations,
+    Payments,
+    PromoCodes,
+    ReferralEarnings,
+    Reviews,
+    Role,
+    User,
 )
-from bot.misc.metrics import get_metrics
-from bot.misc.caching import get_cache_manager
+from bot.misc.caching import get_cache_manager  # noqa: E402
+from bot.misc.metrics import get_metrics  # noqa: E402
 
 
 # Authentication
@@ -77,10 +87,7 @@ class AdminAuth(AuthenticationBackend):
         password = form.get("password")
 
         if username == EnvKeys.ADMIN_USERNAME and password == EnvKeys.ADMIN_PASSWORD:
-            if (
-                username == "admin" and password == "admin"
-                and ip not in ("127.0.0.1", "::1", "localhost")
-            ):
+            if username == "admin" and password == "admin" and ip not in ("127.0.0.1", "::1", "localhost"):
                 await log_audit("web_login_blocked_default_creds", level="WARNING", details=f"ip={ip}", ip_address=ip)
                 return False
             request.session.update({"authenticated": True})
@@ -121,7 +128,7 @@ class AuditModelView(ModelView):
         await log_audit(
             action,
             resource_type=self.name,
-            resource_id=str(getattr(model, 'id', getattr(model, 'name', None))),
+            resource_id=str(getattr(model, "id", getattr(model, "name", None))),
             details=_safe_model_repr(model),
             ip_address=request.client.host,
         )
@@ -130,7 +137,7 @@ class AuditModelView(ModelView):
         await log_audit(
             "sqladmin_delete",
             resource_type=self.name,
-            resource_id=str(getattr(model, 'id', getattr(model, 'name', None))),
+            resource_id=str(getattr(model, "id", getattr(model, "name", None))),
             details=_safe_model_repr(model),
             ip_address=request.client.host,
         )
@@ -138,9 +145,17 @@ class AuditModelView(ModelView):
 
 # Model Views
 class UserAdmin(AuditModelView, model=User):
-    column_list = [User.telegram_id, User.username, User.first_name, User.last_name,
-                   User.balance, User.role_id, User.referral_id,
-                   User.registration_date, User.is_blocked]
+    column_list = [
+        User.telegram_id,
+        User.username,
+        User.first_name,
+        User.last_name,
+        User.balance,
+        User.role_id,
+        User.referral_id,
+        User.registration_date,
+        User.is_blocked,
+    ]
     column_searchable_list = [User.telegram_id, User.username]
     column_sortable_list = [User.telegram_id, User.balance, User.registration_date]
     column_default_sort = (User.registration_date, True)
@@ -150,13 +165,13 @@ class UserAdmin(AuditModelView, model=User):
 
 
 _PERM_FLAGS = [
-    (1,   "USE"),
-    (2,   "BROADCAST"),
-    (4,   "SETTINGS"),
-    (8,   "USERS"),
-    (16,  "CATALOG"),
-    (32,  "ADMINS"),
-    (64,  "OWNER"),
+    (1, "USE"),
+    (2, "BROADCAST"),
+    (4, "SETTINGS"),
+    (8, "USERS"),
+    (16, "CATALOG"),
+    (32, "ADMINS"),
+    (64, "OWNER"),
     (128, "STATS"),
     (256, "BALANCE"),
     (512, "PROMOS"),
@@ -226,9 +241,15 @@ class ItemValuesAdmin(AuditModelView, model=ItemValues):
 
 
 class BoughtGoodsAdmin(ModelView, model=BoughtGoods):
-    column_list = [BoughtGoods.id, BoughtGoods.item_name, BoughtGoods.value,
-                   BoughtGoods.price, BoughtGoods.buyer_id, BoughtGoods.bought_datetime,
-                   BoughtGoods.unique_id]
+    column_list = [
+        BoughtGoods.id,
+        BoughtGoods.item_name,
+        BoughtGoods.value,
+        BoughtGoods.price,
+        BoughtGoods.buyer_id,
+        BoughtGoods.bought_datetime,
+        BoughtGoods.unique_id,
+    ]
     column_searchable_list = [BoughtGoods.item_name, BoughtGoods.buyer_id, BoughtGoods.unique_id]
     column_sortable_list = [BoughtGoods.id, BoughtGoods.bought_datetime, BoughtGoods.price]
     column_default_sort = (BoughtGoods.id, True)
@@ -241,8 +262,7 @@ class BoughtGoodsAdmin(ModelView, model=BoughtGoods):
 
 
 class OperationsAdmin(ModelView, model=Operations):
-    column_list = [Operations.id, Operations.user_id, Operations.operation_value,
-                   Operations.operation_time]
+    column_list = [Operations.id, Operations.user_id, Operations.operation_value, Operations.operation_time]
     column_searchable_list = [Operations.user_id]
     column_sortable_list = [Operations.id, Operations.operation_time, Operations.operation_value]
     column_default_sort = (Operations.id, True)
@@ -255,8 +275,16 @@ class OperationsAdmin(ModelView, model=Operations):
 
 
 class PaymentsAdmin(ModelView, model=Payments):
-    column_list = [Payments.id, Payments.provider, Payments.external_id, Payments.user_id,
-                   Payments.amount, Payments.currency, Payments.status, Payments.created_at]
+    column_list = [
+        Payments.id,
+        Payments.provider,
+        Payments.external_id,
+        Payments.user_id,
+        Payments.amount,
+        Payments.currency,
+        Payments.status,
+        Payments.created_at,
+    ]
     column_searchable_list = [Payments.user_id, Payments.external_id, Payments.provider]
     column_sortable_list = [Payments.id, Payments.created_at, Payments.amount, Payments.status]
     column_default_sort = (Payments.id, True)
@@ -269,9 +297,14 @@ class PaymentsAdmin(ModelView, model=Payments):
 
 
 class ReferralEarningsAdmin(ModelView, model=ReferralEarnings):
-    column_list = [ReferralEarnings.id, ReferralEarnings.referrer_id,
-                   ReferralEarnings.referral_id, ReferralEarnings.amount,
-                   ReferralEarnings.original_amount, ReferralEarnings.created_at]
+    column_list = [
+        ReferralEarnings.id,
+        ReferralEarnings.referrer_id,
+        ReferralEarnings.referral_id,
+        ReferralEarnings.amount,
+        ReferralEarnings.original_amount,
+        ReferralEarnings.created_at,
+    ]
     column_searchable_list = [ReferralEarnings.referrer_id, ReferralEarnings.referral_id]
     column_sortable_list = [ReferralEarnings.id, ReferralEarnings.created_at, ReferralEarnings.amount]
     column_default_sort = (ReferralEarnings.id, True)
@@ -284,9 +317,17 @@ class ReferralEarningsAdmin(ModelView, model=ReferralEarnings):
 
 
 class AuditLogAdmin(ModelView, model=AuditLog):
-    column_list = [AuditLog.id, AuditLog.timestamp, AuditLog.level, AuditLog.user_id,
-                   AuditLog.action, AuditLog.resource_type, AuditLog.resource_id,
-                   AuditLog.details, AuditLog.ip_address]
+    column_list = [
+        AuditLog.id,
+        AuditLog.timestamp,
+        AuditLog.level,
+        AuditLog.user_id,
+        AuditLog.action,
+        AuditLog.resource_type,
+        AuditLog.resource_id,
+        AuditLog.details,
+        AuditLog.ip_address,
+    ]
     column_searchable_list = [AuditLog.action, AuditLog.resource_type, AuditLog.details]
     column_sortable_list = [AuditLog.id, AuditLog.timestamp, AuditLog.level, AuditLog.action]
     column_default_sort = (AuditLog.id, True)
@@ -299,9 +340,17 @@ class AuditLogAdmin(ModelView, model=AuditLog):
 
 
 class PromoCodeAdmin(AuditModelView, model=PromoCodes):
-    column_list = [PromoCodes.id, PromoCodes.code, PromoCodes.discount_type,
-                   PromoCodes.discount_value, PromoCodes.max_uses, PromoCodes.current_uses,
-                   PromoCodes.is_active, PromoCodes.expires_at, PromoCodes.created_at]
+    column_list = [
+        PromoCodes.id,
+        PromoCodes.code,
+        PromoCodes.discount_type,
+        PromoCodes.discount_value,
+        PromoCodes.max_uses,
+        PromoCodes.current_uses,
+        PromoCodes.is_active,
+        PromoCodes.expires_at,
+        PromoCodes.created_at,
+    ]
     column_searchable_list = [PromoCodes.code]
     column_sortable_list = [PromoCodes.id, PromoCodes.code, PromoCodes.created_at]
     column_default_sort = (PromoCodes.id, True)
@@ -323,7 +372,6 @@ class CartItemsAdmin(ModelView, model=CartItems):
     icon = "fa-solid fa-cart-plus"
 
 
-
 class BotSettingsAdmin(ModelView, model=BotSettings):
     column_list = [BotSettings.key, BotSettings.value, BotSettings.description]
     column_sortable_list = [BotSettings.key]
@@ -339,13 +387,14 @@ class BotSettingsAdmin(ModelView, model=BotSettings):
         "value": {
             "description": (
                 "menu_layout — comma-separated row sizes, e.g.: "
-                "\"1\" (all vertical) | \"2\" (2 per row) | \"1,2\" (1st row=1, rest=2) | \"3,2,1\""
+                '"1" (all vertical) | "2" (2 per row) | "1,2" (1st row=1, rest=2) | "3,2,1"'
             )
         }
     }
 
     async def after_model_change(self, data: dict, model: Any, is_created: bool, request: Request) -> None:
         from bot.database.methods.read import invalidate_setting_cache
+
         await invalidate_setting_cache(model.key)
         await log_audit(
             "setting_change",
@@ -357,8 +406,7 @@ class BotSettingsAdmin(ModelView, model=BotSettings):
 
 
 class ReviewsAdmin(AuditModelView, model=Reviews):
-    column_list = [Reviews.id, Reviews.user_id, Reviews.item_name,
-                   Reviews.rating, Reviews.text, Reviews.created_at]
+    column_list = [Reviews.id, Reviews.user_id, Reviews.item_name, Reviews.rating, Reviews.text, Reviews.created_at]
     column_searchable_list = [Reviews.user_id, Reviews.item_name]
     column_sortable_list = [Reviews.id, Reviews.rating, Reviews.created_at]
     column_default_sort = (Reviews.id, True)
@@ -425,7 +473,8 @@ def create_admin_app() -> Starlette:
         Route("/health", health_check),
         Route("/metrics", metrics_json),
         Route("/metrics/prometheus", prometheus_metrics),
-    ] + export_routes
+        *export_routes,
+    ]
 
     app = Starlette(routes=routes)
     app.add_middleware(SessionMiddleware, secret_key=EnvKeys.SECRET_KEY, max_age=1800)

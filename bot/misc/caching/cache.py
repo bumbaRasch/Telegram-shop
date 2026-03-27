@@ -1,7 +1,9 @@
 import json
-from typing import Optional, Any
-from redis.asyncio import Redis
 from functools import wraps
+from typing import Any
+
+from redis.asyncio import Redis
+
 from bot.logger_mesh import logger
 
 
@@ -15,7 +17,7 @@ class CacheManager:
         self.misses = 0
         self._healthy = True
 
-    async def get(self, key: str, deserialize: bool = True) -> Optional[Any]:
+    async def get(self, key: str, deserialize: bool = True) -> Any | None:
         """Get value from cache with correct deserialization"""
         if not self._healthy:
             self.misses += 1
@@ -36,7 +38,7 @@ class CacheManager:
             # Deserialize from JSON (only safe format)
             if isinstance(value, bytes):
                 try:
-                    decoded = value.decode('utf-8')
+                    decoded = value.decode("utf-8")
                     return json.loads(decoded)
                 except (UnicodeDecodeError, json.JSONDecodeError):
                     logger.error(f"Failed to deserialize cache value for key {key}")
@@ -55,13 +57,7 @@ class CacheManager:
             logger.error(f"Cache get error for key {key}: {e}")
             return None
 
-    async def set(
-            self,
-            key: str,
-            value: Any,
-            ttl: Optional[int] = None,
-            serialize: bool = True
-    ) -> bool:
+    async def set(self, key: str, value: Any, ttl: int | None = None, serialize: bool = True) -> bool:
         """Save the value to cache with correct serialization"""
         if not self._healthy:
             return False
@@ -74,12 +70,12 @@ class CacheManager:
 
             # Serialize to JSON only (no pickle — avoids RCE risk)
             try:
-                serialized = json.dumps(value).encode('utf-8')
+                serialized = json.dumps(value).encode("utf-8")
             except (TypeError, ValueError):
                 try:
-                    serialized = json.dumps(value, default=str).encode('utf-8')
+                    serialized = json.dumps(value, default=str).encode("utf-8")
                 except (TypeError, ValueError):
-                    serialized = str(value).encode('utf-8')
+                    serialized = str(value).encode("utf-8")
 
             await self.redis.setex(key, ttl, serialized)
             return True
@@ -140,12 +136,7 @@ class CacheManager:
             return 0
 
 
-
-def cache_result(
-        ttl: int = 300,
-        key_prefix: str = "",
-        key_func: Optional[callable] = None
-):
+def cache_result(ttl: int = 300, key_prefix: str = "", key_func: callable | None = None):
     """Decorator for caching function results"""
 
     def decorator(func):
@@ -157,7 +148,7 @@ def cache_result(
             else:
                 # Automatic key generation
                 key_parts = [key_prefix or func.__name__]
-                key_parts.extend(str(arg) for arg in args if not hasattr(arg, '__dict__'))
+                key_parts.extend(str(arg) for arg in args if not hasattr(arg, "__dict__"))
                 key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
                 cache_key = ":".join(key_parts)
 
@@ -185,10 +176,10 @@ def cache_result(
 
 
 # Singleton for cache manager
-_cache_manager: Optional[CacheManager] = None
+_cache_manager: CacheManager | None = None
 
 
-def get_cache_manager() -> Optional[CacheManager]:
+def get_cache_manager() -> CacheManager | None:
     """get singleton instance cache manager"""
     return _cache_manager
 

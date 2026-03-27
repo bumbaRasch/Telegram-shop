@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from aiogram.filters import BaseFilter
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from bot.database.methods import check_role_cached
 from bot.misc import EnvKeys
@@ -12,6 +12,7 @@ class ValidAmountFilter(BaseFilter):
     """
     Validation of the replenishment amount (used in FSM steps).
     """
+
     min_amount: int = EnvKeys.MIN_AMOUNT
     max_amount: int = EnvKeys.MAX_AMOUNT
 
@@ -29,6 +30,7 @@ class HasPermissionFilter(BaseFilter):
     Filter for the presence of a certain permission for the user (bit mask).
     All specified bits must be set (AND semantics).
     """
+
     permission: int
 
     async def __call__(self, event: Message | CallbackQuery) -> bool:
@@ -43,6 +45,7 @@ class HasAnyPermissionFilter(BaseFilter):
     """
     Filter that passes if user has ANY of the specified permission bits (OR semantics).
     """
+
     permissions: int
 
     async def __call__(self, event: Message | CallbackQuery) -> bool:

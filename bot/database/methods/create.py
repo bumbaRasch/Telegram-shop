@@ -1,14 +1,15 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select, exists, func as sa_func
+from sqlalchemy import exists, select
+from sqlalchemy import func as sa_func
 
-from bot.database.models import User, ItemValues, Goods, Categories, Operations, Payments, ReferralEarnings, Role
-from bot.database.models.main import PromoCodes, CartItems, Reviews
+from bot.constants import CART_MAX_ITEMS, PAYMENT_STATUS_PENDING
 from bot.database import Database
 from bot.database.methods.cache_utils import safe_create_task
 from bot.database.methods.read import invalidate_stats_cache
-from bot.constants import PAYMENT_STATUS_PENDING, CART_MAX_ITEMS
+from bot.database.models import Categories, Goods, ItemValues, Operations, Payments, ReferralEarnings, Role, User
+from bot.database.models.main import CartItems, PromoCodes, Reviews
 
 
 async def create_user(
@@ -16,9 +17,9 @@ async def create_user(
     registration_date: datetime,
     referral_id: int | None,
     role: int = 1,
-    username: str = None,
-    first_name: str = None,
-    last_name: str = None,
+    username: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
 ) -> None:
     """Create user if missing; commit."""
     async with Database().session() as s:
@@ -70,20 +71,25 @@ async def add_values_to_item(item_name: str, value: str, is_infinity: bool) -> b
         if not item_id:
             return False
 
-        dup = (await s.execute(
-            select(exists().where(
-                ItemValues.item_id == item_id,
-                ItemValues.value == value_norm,
-            ))
-        )).scalar()
+        dup = (
+            await s.execute(
+                select(
+                    exists().where(
+                        ItemValues.item_id == item_id,
+                        ItemValues.value == value_norm,
+                    )
+                )
+            )
+        ).scalar()
         if dup:
             return False
 
         try:
             s.add(ItemValues(item_id=item_id, value=value_norm, is_infinity=bool(is_infinity)))
             await s.flush()
-            from bot.database.methods.read import invalidate_item_cache
             from bot.database.methods.cache_utils import safe_create_task
+            from bot.database.methods.read import invalidate_item_cache
+
             safe_create_task(invalidate_item_cache(item_name))
             return True
         except Exception:
@@ -110,14 +116,16 @@ async def create_operation(user_id: int, value: int, operation_time: datetime) -
 async def create_pending_payment(provider: str, external_id: str, user_id: int, amount: int, currency: str) -> None:
     """Create pending payment."""
     async with Database().session() as s:
-        s.add(Payments(
-            provider=provider,
-            external_id=external_id,
-            user_id=user_id,
-            amount=Decimal(amount),
-            currency=currency,
-            status=PAYMENT_STATUS_PENDING,
-        ))
+        s.add(
+            Payments(
+                provider=provider,
+                external_id=external_id,
+                user_id=user_id,
+                amount=Decimal(amount),
+                currency=currency,
+                status=PAYMENT_STATUS_PENDING,
+            )
+        )
 
 
 async def create_referral_earning(referrer_id: int, referral_id: int, amount: int, original_amount: int) -> None:
@@ -128,7 +136,7 @@ async def create_referral_earning(referrer_id: int, referral_id: int, amount: in
                 referrer_id=referrer_id,
                 referral_id=referral_id,
                 amount=Decimal(amount),
-                original_amount=Decimal(original_amount)
+                original_amount=Decimal(original_amount),
             )
         )
 
@@ -151,8 +159,8 @@ async def create_promo_code(
     discount_value,
     max_uses: int = 0,
     expires_at=None,
-    category_id: int = None,
-    item_id: int = None,
+    category_id: int | None = None,
+    item_id: int | None = None,
 ) -> int | None:
     """Create a promo code. Returns ID or None if code already exists."""
     async with Database().session() as s:
@@ -173,19 +181,15 @@ async def create_promo_code(
         return promo.id
 
 
-async def add_to_cart(user_id: int, item_name: str, promo_code: str = None) -> tuple[bool, str]:
+async def add_to_cart(user_id: int, item_name: str, promo_code: str | None = None) -> tuple[bool, str]:
     """Add item to user's cart. Returns (success, message)."""
     async with Database().session() as s:
-        count = (await s.execute(
-            select(sa_func.count(CartItems.id)).where(CartItems.user_id == user_id)
-        )).scalar() or 0
+        count = (await s.execute(select(sa_func.count(CartItems.id)).where(CartItems.user_id == user_id))).scalar() or 0
         if count >= CART_MAX_ITEMS:
             return False, "cart_full"
 
         # Check item exists
-        item_exists = (await s.execute(
-            select(exists().where(Goods.name == item_name))
-        )).scalar()
+        item_exists = (await s.execute(select(exists().where(Goods.name == item_name)))).scalar()
         if not item_exists:
             return False, "item_not_found"
 
@@ -193,16 +197,12 @@ async def add_to_cart(user_id: int, item_name: str, promo_code: str = None) -> t
         return True, "success"
 
 
-
-async def create_review(user_id: int, item_name: str, rating: int, text: str = None) -> int | None:
+async def create_review(user_id: int, item_name: str, rating: int, text: str | None = None) -> int | None:
     """Create a review. Returns ID or None if already reviewed."""
     async with Database().session() as s:
-        existing = (await s.execute(
-            select(exists().where(
-                Reviews.user_id == user_id,
-                Reviews.item_name == item_name
-            ))
-        )).scalar()
+        existing = (
+            await s.execute(select(exists().where(Reviews.user_id == user_id, Reviews.item_name == item_name)))
+        ).scalar()
         if existing:
             return None
         review = Reviews(

@@ -1,20 +1,20 @@
-from bot.handlers.user._helpers import edit_msg
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
-from bot.i18n import localize
-from bot.database.models import Permission
 from bot.database.methods import check_category_cached, create_category, delete_category, update_category
-from bot.keyboards.inline import back, simple_buttons
-from bot.filters import HasPermissionFilter
 from bot.database.methods.audit import log_audit
+from bot.database.models import Permission
+from bot.filters import HasPermissionFilter
+from bot.handlers.user._helpers import edit_msg
+from bot.i18n import localize
+from bot.keyboards.inline import back, simple_buttons
 from bot.misc import CategoryRequest
 from bot.states import CategoryFSM
 
 router = Router()
 
 
-@router.callback_query(F.data == 'categories_management', HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
+@router.callback_query(F.data == "categories_management", HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
 async def categories_callback_handler(call: CallbackQuery):
     """
     Opens the categories management submenu.
@@ -25,18 +25,20 @@ async def categories_callback_handler(call: CallbackQuery):
         (localize("admin.categories.delete"), "delete_category"),
         (localize("btn.back"), "console"),
     ]
-    await edit_msg(call.message, 
+    await edit_msg(
+        call.message,
         localize("admin.categories.menu.title"),
         reply_markup=simple_buttons(actions, per_row=1),
     )
 
 
-@router.callback_query(F.data == 'add_category', HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
+@router.callback_query(F.data == "add_category", HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
 async def add_category_callback_handler(call: CallbackQuery, state):
     """
     Asks admin for a new category name.
     """
-    await edit_msg(call.message, 
+    await edit_msg(
+        call.message,
         localize("admin.categories.prompt.add"),
         reply_markup=back("categories_management"),
     )
@@ -64,24 +66,37 @@ async def process_category_for_add(message: Message, state):
             )
 
             admin_info = await message.bot.get_chat(message.from_user.id)
-            await log_audit("create_category", user_id=message.from_user.id, resource_type="Category", resource_id=category_name, details=f"admin={admin_info.first_name}")
+            await log_audit(
+                "create_category",
+                user_id=message.from_user.id,
+                resource_type="Category",
+                resource_id=category_name,
+                details=f"admin={admin_info.first_name}",
+            )
 
     except Exception as e:
         await message.answer(
             localize("errors.invalid_data"),
             reply_markup=back("categories_management"),
         )
-        await log_audit("create_category_error", level="ERROR", user_id=message.from_user.id, resource_type="Category", details=str(e))
+        await log_audit(
+            "create_category_error",
+            level="ERROR",
+            user_id=message.from_user.id,
+            resource_type="Category",
+            details=str(e),
+        )
 
     await state.clear()
 
 
-@router.callback_query(F.data == 'delete_category', HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
+@router.callback_query(F.data == "delete_category", HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
 async def delete_category_callback_handler(call: CallbackQuery, state):
     """
     Asks admin for a category name to delete.
     """
-    await edit_msg(call.message, 
+    await edit_msg(
+        call.message,
         localize("admin.categories.prompt.delete"),
         reply_markup=back("categories_management"),
     )
@@ -108,17 +123,24 @@ async def process_category_for_delete(message: Message, state):
             reply_markup=back("categories_management"),
         )
         admin_info = await message.bot.get_chat(message.from_user.id)
-        await log_audit("delete_category", user_id=message.from_user.id, resource_type="Category", resource_id=category_name, details=f"admin={admin_info.first_name}")
+        await log_audit(
+            "delete_category",
+            user_id=message.from_user.id,
+            resource_type="Category",
+            resource_id=category_name,
+            details=f"admin={admin_info.first_name}",
+        )
 
     await state.clear()
 
 
-@router.callback_query(F.data == 'update_category', HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
+@router.callback_query(F.data == "update_category", HasPermissionFilter(permission=Permission.CATALOG_MANAGE))
 async def update_category_callback_handler(call: CallbackQuery, state):
     """
     Asks admin for current category name before renaming.
     """
-    await edit_msg(call.message, 
+    await edit_msg(
+        call.message,
         localize("admin.categories.prompt.rename.old"),
         reply_markup=back("categories_management"),
     )
@@ -172,6 +194,12 @@ async def check_category_name_for_update(message: Message, state):
     )
 
     admin_info = await message.bot.get_chat(message.from_user.id)
-    await log_audit("rename_category", user_id=message.from_user.id, resource_type="Category", resource_id=new_name, details=f"admin={admin_info.first_name}, old_name={old_name}")
+    await log_audit(
+        "rename_category",
+        user_id=message.from_user.id,
+        resource_type="Category",
+        resource_id=new_name,
+        details=f"admin={admin_info.first_name}, old_name={old_name}",
+    )
 
     await state.clear()

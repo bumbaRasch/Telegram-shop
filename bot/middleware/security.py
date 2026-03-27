@@ -1,12 +1,14 @@
 import re
 import time
-from typing import Dict, Any, Callable, Awaitable
-from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, CallbackQuery, Message
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from bot.i18n import localize
+from aiogram import BaseMiddleware
+from aiogram.types import CallbackQuery, Message, TelegramObject
+
 from bot.database.methods.audit import log_audit
 from bot.database.models import Permission
+from bot.i18n import localize
 
 
 def check_suspicious_patterns(text: str) -> bool:
@@ -35,13 +37,23 @@ class SecurityMiddleware(BaseMiddleware):
 
     def __init__(self):
         self.critical_actions = {
-            'buy_', 'pay_', 'delete_', 'admin',
-            'fill-user-balance', 'deduct-user-balance',
-            'role_mgmt', 'role_new', 'role_d', 'asr_'
+            "buy_",
+            "pay_",
+            "delete_",
+            "admin",
+            "fill-user-balance",
+            "deduct-user-balance",
+            "role_mgmt",
+            "role_new",
+            "role_d",
+            "asr_",
         }
         # Only transactional actions get replay protection (message age check)
         self.replay_protected_actions = {
-            'buy_', 'pay_', 'fill-user-balance', 'deduct-user-balance',
+            "buy_",
+            "pay_",
+            "fill-user-balance",
+            "deduct-user-balance",
         }
 
     def is_critical_action(self, callback_data: str) -> bool:
@@ -49,26 +61,20 @@ class SecurityMiddleware(BaseMiddleware):
         if not callback_data:
             return False
 
-        return any(
-            callback_data.startswith(action)
-            for action in self.critical_actions
-        )
+        return any(callback_data.startswith(action) for action in self.critical_actions)
 
     def is_replay_protected(self, callback_data: str) -> bool:
         """Check if this action needs replay attack protection"""
         if not callback_data:
             return False
 
-        return any(
-            callback_data.startswith(action)
-            for action in self.replay_protected_actions
-        )
+        return any(callback_data.startswith(action) for action in self.replay_protected_actions)
 
     async def __call__(
-            self,
-            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-            event: TelegramObject,
-            data: Dict[str, Any]
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
     ) -> Any:
         """Basic middleware logic"""
 
@@ -90,13 +96,10 @@ class SecurityMiddleware(BaseMiddleware):
 
             # Replay protection only for transactional actions (buy, pay, balance)
             if self.is_replay_protected(event.data):
-                if hasattr(event.message, 'date'):
+                if hasattr(event.message, "date"):
                     message_age = time.time() - event.message.date.timestamp()
                     if message_age > 3600:  # 1 hour
-                        await event.answer(
-                            localize("middleware.security.session_outdated"),
-                            show_alert=True
-                        )
+                        await event.answer(localize("middleware.security.session_outdated"), show_alert=True)
                         return None
 
         # Check for suspicious patterns in the data
@@ -132,18 +135,20 @@ class AuthenticationMiddleware(BaseMiddleware):
 
     def __init__(self):
         self.blocked_users: set[int] = set()
-        self.admin_cache: Dict[int, tuple[int, float]] = {}  # user_id: (role, timestamp)
+        self.admin_cache: dict[int, tuple[int, float]] = {}  # user_id: (role, timestamp)
         self.cache_ttl = 300  # 5 minutes
         self._maintenance_mode: bool = False
 
     @property
     def maintenance_mode(self) -> bool:
-        from bot.misc.caching import get_cache_manager
         import asyncio
+
+        from bot.misc.caching import get_cache_manager
+
         cache = get_cache_manager()
         if cache:
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # In async context, return cached in-memory value (updated via setter)
                 return self._maintenance_mode
             except RuntimeError:
@@ -154,16 +159,18 @@ class AuthenticationMiddleware(BaseMiddleware):
     def maintenance_mode(self, value: bool):
         self._maintenance_mode = value
         from bot.misc.caching import get_cache_manager
+
         cache = get_cache_manager()
         if cache:
             from bot.database.methods.cache_utils import safe_create_task
+
             safe_create_task(cache.set("bot:maintenance_mode", value, ttl=86400 * 30))
 
     async def __call__(
-            self,
-            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-            event: TelegramObject,
-            data: Dict[str, Any]
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
     ) -> Any:
         """Authentication Check"""
 
@@ -176,6 +183,7 @@ class AuthenticationMiddleware(BaseMiddleware):
 
         # Checking blocked users (from DB and memory cache)
         from bot.database.methods import is_user_blocked
+
         if user.id in self.blocked_users or await is_user_blocked(user.id):
             self.blocked_users.add(user.id)  # Update memory cache
             if isinstance(event, CallbackQuery):
@@ -198,18 +206,18 @@ class AuthenticationMiddleware(BaseMiddleware):
                 return None
 
         # Add user information to the context
-        data['user_id'] = user.id
-        data['user_name'] = user.first_name
+        data["user_id"] = user.id
+        data["user_name"] = user.first_name
 
         # Role validation and caching for admin actions
         if isinstance(event, CallbackQuery):
-            if event.data and any(event.data.startswith(x) for x in ['admin', 'console', 'send_message']):
+            if event.data and any(event.data.startswith(x) for x in ["admin", "console", "send_message"]):
                 role = await self.get_user_role_cached(user.id)
                 if not Permission.has_any_admin_perm(role):
                     await event.answer(localize("middleware.security.not_admin"), show_alert=True)
                     await log_audit("unauthorized_admin_access", level="WARNING", user_id=user.id)
                     return None
-                data['user_role'] = role
+                data["user_role"] = role
 
         return await handler(event, data)
 
@@ -223,6 +231,7 @@ class AuthenticationMiddleware(BaseMiddleware):
 
         # Download from DB
         from bot.database.methods import check_role
+
         role = await check_role(user_id) or 0
 
         # Refresh cache
@@ -237,6 +246,7 @@ class AuthenticationMiddleware(BaseMiddleware):
     async def load_blocked_users(self) -> None:
         """Load blocked users from DB into memory cache on startup."""
         from bot.database.methods.read import get_blocked_user_ids
+
         try:
             self.blocked_users = set(await get_blocked_user_ids())
         except Exception:
@@ -244,6 +254,7 @@ class AuthenticationMiddleware(BaseMiddleware):
 
         # Restore maintenance mode from Redis
         from bot.misc.caching import get_cache_manager
+
         cache = get_cache_manager()
         if cache:
             try:
@@ -256,6 +267,7 @@ class AuthenticationMiddleware(BaseMiddleware):
     async def block_user(self, user_id: int) -> bool:
         """Block a user (saves to DB and memory cache)"""
         from bot.database.methods import set_user_blocked
+
         success = await set_user_blocked(user_id, True)
         if success:
             self.blocked_users.add(user_id)
@@ -265,6 +277,7 @@ class AuthenticationMiddleware(BaseMiddleware):
     async def unblock_user(self, user_id: int) -> bool:
         """Unblock a user (saves to DB and removes from memory cache)"""
         from bot.database.methods import set_user_blocked
+
         success = await set_user_blocked(user_id, False)
         if success:
             self.blocked_users.discard(user_id)

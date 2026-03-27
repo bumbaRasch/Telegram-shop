@@ -1,34 +1,34 @@
-from bot.handlers.user._helpers import edit_msg
 import time
 from datetime import datetime
-from typing import Optional
 
-from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message
-from aiogram.fsm.context import FSMContext
+from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
-from bot.i18n import localize
-from bot.database.models import Permission
+from bot.constants import BROADCAST_BATCH_DELAY, BROADCAST_BATCH_SIZE, BROADCAST_PROGRESS_THROTTLE
 from bot.database.methods import get_all_users
-from bot.keyboards import back, close
 from bot.database.methods.audit import log_audit
+from bot.database.models import Permission
 from bot.filters import HasPermissionFilter
+from bot.handlers.user._helpers import edit_msg
+from bot.i18n import localize
+from bot.keyboards import back, close
 from bot.misc import BroadcastMessage, sanitize_html
 from bot.misc.services import BroadcastManager, BroadcastStats
 from bot.states import BroadcastFSM
-from bot.constants import BROADCAST_BATCH_SIZE, BROADCAST_BATCH_DELAY, BROADCAST_PROGRESS_THROTTLE
 
 router = Router()
 
 # Global mailing list manager
-broadcast_manager: Optional[BroadcastManager] = None
+broadcast_manager: BroadcastManager | None = None
 
 
 @router.callback_query(F.data == "send_message", HasPermissionFilter(permission=Permission.BROADCAST))
 async def send_message_callback_handler(call: CallbackQuery, state: FSMContext):
     """Beginning of mailing"""
-    await edit_msg(call.message, 
+    await edit_msg(
+        call.message,
         localize("broadcast.prompt"),
         reply_markup=back("console"),
     )
@@ -42,10 +42,7 @@ async def broadcast_messages(message: Message, state: FSMContext):
 
     try:
         # Validate broadcast message
-        broadcast_msg = BroadcastMessage(
-            text=message.text,
-            parse_mode="HTML"
-        )
+        broadcast_msg = BroadcastMessage(text=message.text, parse_mode="HTML")
 
         # Sanitize HTML if needed
         safe_text = sanitize_html(broadcast_msg.text) if broadcast_msg.parse_mode == "HTML" else broadcast_msg.text
@@ -57,8 +54,7 @@ async def broadcast_messages(message: Message, state: FSMContext):
 
         # Create a progress message
         progress_msg = await message.answer(
-            localize("broadcast.creating", ids=len(user_ids)),
-            reply_markup=back("send_message")
+            localize("broadcast.creating", ids=len(user_ids)), reply_markup=back("send_message")
         )
 
         # Progress update function — throttled to at most once every 2 seconds
@@ -73,13 +69,15 @@ async def broadcast_messages(message: Message, state: FSMContext):
             progress = (stats.sent + stats.failed) / stats.total * 100
             try:
                 await progress_msg.edit_text(
-                    localize("broadcast.progress",
-                             progress=progress,
-                             sent=stats.sent,
-                             total=stats.total,
-                             failed=stats.failed,
-                             time=int((datetime.now() - stats.start_time).total_seconds())),
-                    reply_markup=back("send_message")
+                    localize(
+                        "broadcast.progress",
+                        progress=progress,
+                        sent=stats.sent,
+                        total=stats.total,
+                        failed=stats.failed,
+                        time=int((datetime.now() - stats.start_time).total_seconds()),
+                    ),
+                    reply_markup=back("send_message"),
                 )
             except (TelegramBadRequest, TelegramForbiddenError) as e:
                 await log_audit("broadcast_progress_fail", level="WARNING", details=str(e))
@@ -96,31 +94,34 @@ async def broadcast_messages(message: Message, state: FSMContext):
             text=safe_text,
             reply_markup=close(),
             parse_mode=str(broadcast_msg.parse_mode),
-            progress_callback=update_progress
+            progress_callback=update_progress,
         )
 
         # Final message
         duration = int(stats.duration) if stats.duration else 0
         await progress_msg.edit_text(
-            localize("broadcast.done",
-                     total=stats.total,
-                     sent=stats.sent,
-                     failed=stats.failed,
-                     blocked=stats.blocked,
-                     success=f"{stats.success_rate:.1f}",
-                     duration=duration),
-            reply_markup=back("send_message")
+            localize(
+                "broadcast.done",
+                total=stats.total,
+                sent=stats.sent,
+                failed=stats.failed,
+                blocked=stats.blocked,
+                success=f"{stats.success_rate:.1f}",
+                duration=duration,
+            ),
+            reply_markup=back("send_message"),
         )
 
         # Logging
         user_info = await message.bot.get_chat(message.from_user.id)
-        await log_audit("broadcast_sent", user_id=user_info.id, details=f"admin={user_info.first_name}, delivered={stats.sent}/{stats.total}, duration={duration}s")
+        await log_audit(
+            "broadcast_sent",
+            user_id=user_info.id,
+            details=f"admin={user_info.first_name}, delivered={stats.sent}/{stats.total}, duration={duration}s",
+        )
 
     except Exception as e:
-        await message.answer(
-            localize("errors.invalid_data"),
-            reply_markup=back("send_message")
-        )
+        await message.answer(localize("errors.invalid_data"), reply_markup=back("send_message"))
         await log_audit("broadcast_error", level="ERROR", user_id=message.from_user.id, details=str(e))
 
     await state.clear()

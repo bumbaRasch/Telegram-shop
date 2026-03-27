@@ -1,10 +1,10 @@
-from .main import router as main_router
-from .balance_and_payment import router as balance_and_payment_router
-from .shop_and_goods import router as shop_and_goods_router
-from .referral_system import router as referral_system_router
-from .cart import router as cart_router
-
 from aiogram import Router
+
+from .balance_and_payment import router as balance_and_payment_router
+from .cart import router as cart_router
+from .main import router as main_router
+from .referral_system import router as referral_system_router
+from .shop_and_goods import router as shop_and_goods_router
 
 router = Router()
 router.include_router(main_router)

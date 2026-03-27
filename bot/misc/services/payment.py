@@ -1,13 +1,12 @@
-import aiohttp
 import json
 import math
-from typing import Optional
 
+import aiohttp
 from aiogram import Bot
 from aiogram.types import LabeledPrice
 
-from bot.misc import EnvKeys
 from bot.i18n import localize
+from bot.misc import EnvKeys
 
 # Currencies without minor units (no cents)
 ZERO_DEC_CURRENCIES = {"JPY", "KRW"}
@@ -18,16 +17,16 @@ def currency_to_stars(amount_rub: int) -> int:
     Convert currency amount to integer number of Telegram Stars.
     round up (ceil) to avoid undercharging.
     """
-    return int(math.ceil(float(amount_rub) * EnvKeys.STARS_PER_VALUE))
+    return math.ceil(float(amount_rub) * EnvKeys.STARS_PER_VALUE)
 
 
 async def send_stars_invoice(
-        bot: Bot,
-        chat_id: int,
-        amount: int,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        payload_extra: Optional[dict] = None,
+    bot: Bot,
+    chat_id: int,
+    amount: int,
+    title: str | None = None,
+    description: str | None = None,
+    payload_extra: dict | None = None,
 ):
     """
     Send Telegram Stars invoice (currency='XTR', provider_token='').
@@ -47,7 +46,8 @@ async def send_stars_invoice(
     await bot.send_invoice(
         chat_id=chat_id,
         title=title or localize("payments.invoice.title.topup"),
-        description=description or localize("payments.invoice.desc.topup.stars", amount=int(amount), currency=EnvKeys.PAY_CURRENCY),
+        description=description
+        or localize("payments.invoice.desc.topup.stars", amount=int(amount), currency=EnvKeys.PAY_CURRENCY),
         payload=json.dumps(payload),
         provider_token="",
         currency="XTR",
@@ -63,12 +63,12 @@ def _minor_units_for(currency: str) -> int:
 
 
 async def send_fiat_invoice(
-        *,
-        bot: Bot,
-        chat_id: int,
-        amount: int,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
+    *,
+    bot: Bot,
+    chat_id: int,
+    amount: int,
+    title: str | None = None,
+    description: str | None = None,
 ):
     """
     Send invoice via Telegram Payments (fiat provider).
@@ -105,7 +105,7 @@ async def send_fiat_invoice(
 class CryptoPayAPIError(Exception):
     """Exception raised when CryptoPay API returns an error."""
 
-    def __init__(self, code: int, name: str, message: str = None):
+    def __init__(self, code: int, name: str, message: str | None = None):
         self.code = code
         self.name = name
         self.message = message or name
@@ -126,6 +126,7 @@ class CircuitBreaker:
     def is_open(self) -> bool:
         if self._state == "open":
             import time
+
             if time.time() - self._last_failure_time > self.recovery_timeout:
                 self._state = "closed"
                 self._failure_count = 0
@@ -139,6 +140,7 @@ class CircuitBreaker:
 
     def record_failure(self):
         import time
+
         self._failure_count += 1
         self._last_failure_time = time.time()
         if self._failure_count >= self.failure_threshold:
@@ -155,7 +157,7 @@ class CryptoPayAPI:
     """
 
     _timeout = aiohttp.ClientTimeout(total=30)
-    _session: Optional[aiohttp.ClientSession] = None
+    _session: aiohttp.ClientSession | None = None
 
     def __init__(self):
         self.token = EnvKeys.CRYPTO_PAY_TOKEN
@@ -179,7 +181,7 @@ class CryptoPayAPI:
             raise CryptoPayAPIError(
                 code=503,
                 name="SERVICE_UNAVAILABLE",
-                message="CryptoPay API temporarily unavailable, please try again later"
+                message="CryptoPay API temporarily unavailable, please try again later",
             )
 
         headers = {"Crypto-Pay-API-Token": self.token}
@@ -204,23 +206,20 @@ class CryptoPayAPI:
         # Check for API-level errors (HTTP 200 but ok=false)
         if not data.get("ok", False):
             error = data.get("error", {})
-            raise CryptoPayAPIError(
-                code=error.get("code", 0),
-                name=error.get("name", "UNKNOWN_ERROR")
-            )
+            raise CryptoPayAPIError(code=error.get("code", 0), name=error.get("name", "UNKNOWN_ERROR"))
 
         self.circuit_breaker.record_success()
         return data
 
     async def create_invoice(
-            self,
-            amount: float,
-            expires_in: int,
-            currency: str = getattr(EnvKeys, "PAY_CURRENCY", None) or "RUB",
-            accepted_assets: str = "TON,USDT",
-            payload: Optional[str] = None,
-            description: Optional[str] = None,
-            hidden_message: Optional[str] = None,
+        self,
+        amount: float,
+        expires_in: int,
+        currency: str = getattr(EnvKeys, "PAY_CURRENCY", None) or "RUB",
+        accepted_assets: str = "TON,USDT",
+        payload: str | None = None,
+        description: str | None = None,
+        hidden_message: str | None = None,
     ) -> dict:
         """
         Create a Crypto Pay invoice for given fiat amount/currency.

@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
 from bot.database.dsn import dsn
@@ -16,12 +16,10 @@ class Database(metaclass=SingletonMeta):
             dsn(),
             echo=False,
             pool_pre_ping=True,
-
             pool_size=20,
             max_overflow=40,
             pool_timeout=30,
             pool_recycle=3600,
-
             connect_args={
                 "timeout": 10,
                 "command_timeout": 30,

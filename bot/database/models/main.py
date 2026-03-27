@@ -2,24 +2,37 @@ import datetime
 from typing import Any
 
 from sqlalchemy import (
-    Column, Integer, String, BigInteger, ForeignKey, Text, Boolean,
-    DateTime, Numeric, Index, UniqueConstraint, CheckConstraint, func, select
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    select,
 )
-from bot.database.main import Database
 from sqlalchemy.orm import relationship
+
+from bot.database.main import Database
 
 
 class Permission:
-    USE             = 1 << 0   #   1 — basic access
-    BROADCAST       = 1 << 1   #   2 — mass messaging
-    SETTINGS_MANAGE = 1 << 2   #   4 — bot settings (maintenance, etc.)
-    USERS_MANAGE    = 1 << 3   #   8 — view/block/unblock users, referrals, purchases
-    CATALOG_MANAGE  = 1 << 4   #  16 — categories, positions, items/goods CRUD
-    ADMINS_MANAGE   = 1 << 5   #  32 — role CRUD, role assignment
-    OWN             = 1 << 6   #  64 — owner-only operations
-    STATS_VIEW      = 1 << 7   # 128 — statistics, logs, bought-item search
-    BALANCE_MANAGE  = 1 << 8   # 256 — top-up / deduct user balance
-    PROMO_MANAGE    = 1 << 9   # 512 — promo code CRUD
+    USE = 1 << 0  #   1 — basic access
+    BROADCAST = 1 << 1  #   2 — mass messaging
+    SETTINGS_MANAGE = 1 << 2  #   4 — bot settings (maintenance, etc.)
+    USERS_MANAGE = 1 << 3  #   8 — view/block/unblock users, referrals, purchases
+    CATALOG_MANAGE = 1 << 4  #  16 — categories, positions, items/goods CRUD
+    ADMINS_MANAGE = 1 << 5  #  32 — role CRUD, role assignment
+    OWN = 1 << 6  #  64 — owner-only operations
+    STATS_VIEW = 1 << 7  # 128 — statistics, logs, bought-item search
+    BALANCE_MANAGE = 1 << 8  # 256 — top-up / deduct user balance
+    PROMO_MANAGE = 1 << 9  # 512 — promo code CRUD
 
     @staticmethod
     def is_subset(perms: int, of: int) -> bool:
@@ -33,15 +46,15 @@ class Permission:
 
 
 class Role(Database.BASE):
-    __tablename__ = 'roles'
+    __tablename__ = "roles"
     id = Column(Integer, primary_key=True)
     name = Column(String(64), unique=True)
     default = Column(Boolean, default=False, index=True)
     permissions = Column(Integer)
-    users = relationship('User', backref='role', lazy='raise')
+    users = relationship("User", backref="role", lazy="raise")
 
     def __init__(self, name: str, permissions=None, **kwargs):
-        super(Role, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if self.permissions is None:
             self.permissions = 0
         self.name = name
@@ -50,18 +63,31 @@ class Role(Database.BASE):
     @staticmethod
     async def insert_roles():
         roles = {
-            'USER': [Permission.USE],
-            'ADMIN': [Permission.USE, Permission.BROADCAST,
-                      Permission.SETTINGS_MANAGE, Permission.USERS_MANAGE,
-                      Permission.CATALOG_MANAGE, Permission.STATS_VIEW,
-                      Permission.BALANCE_MANAGE, Permission.PROMO_MANAGE],
-            'OWNER': [Permission.USE, Permission.BROADCAST,
-                      Permission.SETTINGS_MANAGE, Permission.USERS_MANAGE,
-                      Permission.CATALOG_MANAGE, Permission.ADMINS_MANAGE,
-                      Permission.OWN, Permission.STATS_VIEW,
-                      Permission.BALANCE_MANAGE, Permission.PROMO_MANAGE],
+            "USER": [Permission.USE],
+            "ADMIN": [
+                Permission.USE,
+                Permission.BROADCAST,
+                Permission.SETTINGS_MANAGE,
+                Permission.USERS_MANAGE,
+                Permission.CATALOG_MANAGE,
+                Permission.STATS_VIEW,
+                Permission.BALANCE_MANAGE,
+                Permission.PROMO_MANAGE,
+            ],
+            "OWNER": [
+                Permission.USE,
+                Permission.BROADCAST,
+                Permission.SETTINGS_MANAGE,
+                Permission.USERS_MANAGE,
+                Permission.CATALOG_MANAGE,
+                Permission.ADMINS_MANAGE,
+                Permission.OWN,
+                Permission.STATS_VIEW,
+                Permission.BALANCE_MANAGE,
+                Permission.PROMO_MANAGE,
+            ],
         }
-        default_role = 'USER'
+        default_role = "USER"
         async with Database().session() as s:
             for r, perms in roles.items():
                 result = await s.execute(select(Role).filter_by(name=r))
@@ -72,7 +98,7 @@ class Role(Database.BASE):
                 role.reset_permissions()
                 for perm in perms:
                     role.add_permission(perm)
-                role.default = (role.name == default_role)
+                role.default = role.name == default_role
 
     def add_permission(self, perm):
         self.permissions |= perm
@@ -87,39 +113,39 @@ class Role(Database.BASE):
         return self.permissions & perm == perm
 
     def __repr__(self):
-        return '<Role %r>' % self.name
+        return f"<Role {self.name!r}>"
 
 
 class User(Database.BASE):
-    __tablename__ = 'users'
+    __tablename__ = "users"
     telegram_id = Column(BigInteger, primary_key=True)
     username = Column(String(64), nullable=True, index=True)
     first_name = Column(String(64), nullable=True)
     last_name = Column(String(64), nullable=True)
-    role_id = Column(Integer, ForeignKey('roles.id', ondelete="RESTRICT"), default=1, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="RESTRICT"), default=1, index=True)
     balance = Column(Numeric(12, 2), nullable=False, default=0)
-    referral_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="SET NULL"), nullable=True, index=True)
+    referral_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="SET NULL"), nullable=True, index=True)
     registration_date = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     is_blocked = Column(Boolean, default=False, index=True)
-    user_operations = relationship("Operations", back_populates="user_telegram_id", lazy='raise')
-    user_goods = relationship("BoughtGoods", back_populates="user_telegram_id", lazy='raise')
+    user_operations = relationship("Operations", back_populates="user_telegram_id", lazy="raise")
+    user_goods = relationship("BoughtGoods", back_populates="user_telegram_id", lazy="raise")
 
     __table_args__ = (
-        CheckConstraint('referral_id != telegram_id', name='ck_users_no_self_referral'),
-        Index('ix_users_registration_date', 'registration_date'),
+        CheckConstraint("referral_id != telegram_id", name="ck_users_no_self_referral"),
+        Index("ix_users_registration_date", "registration_date"),
     )
 
     referral_earnings_received = relationship(
         "ReferralEarnings",
         foreign_keys="ReferralEarnings.referrer_id",
         back_populates="referrer",
-        lazy='raise',
+        lazy="raise",
     )
     referral_earnings_generated = relationship(
         "ReferralEarnings",
         foreign_keys="ReferralEarnings.referral_id",
         back_populates="referral",
-        lazy='raise',
+        lazy="raise",
     )
 
     def __str__(self):
@@ -128,9 +154,18 @@ class User(Database.BASE):
         parts = " ".join(p for p in (self.first_name, self.last_name) if p)
         return f"{parts} ({self.telegram_id})" if parts else str(self.telegram_id)
 
-    def __init__(self, telegram_id: int, registration_date: datetime.datetime, balance=0, referral_id=None,
-                 role_id: int = 1, username: str = None, first_name: str = None, last_name: str = None,
-                 **kw: Any):
+    def __init__(
+        self,
+        telegram_id: int,
+        registration_date: datetime.datetime,
+        balance=0,
+        referral_id=None,
+        role_id: int = 1,
+        username: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        **kw: Any,
+    ):
         super().__init__(**kw)
         self.telegram_id = telegram_id
         self.role_id = role_id
@@ -143,10 +178,10 @@ class User(Database.BASE):
 
 
 class Categories(Database.BASE):
-    __tablename__ = 'categories'
+    __tablename__ = "categories"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
-    items = relationship("Goods", back_populates="category", lazy='raise')
+    items = relationship("Goods", back_populates="category", lazy="raise")
 
     def __init__(self, name: str, **kw: Any):
         super().__init__(**kw)
@@ -154,14 +189,14 @@ class Categories(Database.BASE):
 
 
 class Goods(Database.BASE):
-    __tablename__ = 'goods'
+    __tablename__ = "goods"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
     price = Column(Numeric(12, 2), nullable=False)
     description = Column(Text, nullable=False)
-    category_id = Column(Integer, ForeignKey('categories.id', ondelete="CASCADE"), nullable=False, index=True)
-    category = relationship("Categories", back_populates="items", lazy='raise')
-    values = relationship("ItemValues", back_populates="item", lazy='raise')
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False, index=True)
+    category = relationship("Categories", back_populates="items", lazy="raise")
+    values = relationship("ItemValues", back_populates="item", lazy="raise")
 
     def __init__(self, name: str, price, description: str, category_id: int, **kw: Any):
         super().__init__(**kw)
@@ -172,16 +207,16 @@ class Goods(Database.BASE):
 
 
 class ItemValues(Database.BASE):
-    __tablename__ = 'item_values'
+    __tablename__ = "item_values"
     id = Column(Integer, primary_key=True)
-    item_id = Column(Integer, ForeignKey('goods.id', ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey("goods.id", ondelete="CASCADE"), nullable=False, index=True)
     value = Column(Text, nullable=True)
     is_infinity = Column(Boolean, nullable=False)
-    item = relationship("Goods", back_populates="values", lazy='raise')
+    item = relationship("Goods", back_populates="values", lazy="raise")
 
     __table_args__ = (
-        UniqueConstraint('item_id', 'value', name='uq_item_value_per_item'),
-        Index('ix_item_values_item_inf', 'item_id', 'is_infinity'),
+        UniqueConstraint("item_id", "value", name="uq_item_value_per_item"),
+        Index("ix_item_values_item_inf", "item_id", "is_infinity"),
     )
 
     def __init__(self, item_id: int, value: str, is_infinity: bool, **kw: Any):
@@ -192,19 +227,19 @@ class ItemValues(Database.BASE):
 
 
 class BoughtGoods(Database.BASE):
-    __tablename__ = 'bought_goods'
+    __tablename__ = "bought_goods"
     id = Column(Integer, primary_key=True)
     item_name = Column(String(100), nullable=False, index=True)
     value = Column(Text, nullable=False)
     price = Column(Numeric(12, 2), nullable=False)
-    buyer_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="SET NULL"), nullable=True, index=True)
+    buyer_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="SET NULL"), nullable=True, index=True)
     bought_datetime = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     unique_id = Column(BigInteger, nullable=False, unique=True)
-    user_telegram_id = relationship("User", back_populates="user_goods", lazy='raise')
+    user_telegram_id = relationship("User", back_populates="user_goods", lazy="raise")
 
     __table_args__ = (
-        Index('ix_bought_goods_datetime', 'bought_datetime'),
-        Index('ix_bought_goods_buyer_datetime', 'buyer_id', 'bought_datetime'),
+        Index("ix_bought_goods_datetime", "bought_datetime"),
+        Index("ix_bought_goods_buyer_datetime", "buyer_id", "bought_datetime"),
     )
 
     def __init__(self, name: str, value: str, price, bought_datetime, unique_id, buyer_id: int = 0, **kw: Any):
@@ -218,16 +253,14 @@ class BoughtGoods(Database.BASE):
 
 
 class Operations(Database.BASE):
-    __tablename__ = 'operations'
+    __tablename__ = "operations"
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="SET NULL"), nullable=True, index=True)
     operation_value = Column(Numeric(12, 2), nullable=False)
     operation_time = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    user_telegram_id = relationship("User", back_populates="user_operations", lazy='raise')
+    user_telegram_id = relationship("User", back_populates="user_operations", lazy="raise")
 
-    __table_args__ = (
-        Index('ix_operations_time', 'operation_time'),
-    )
+    __table_args__ = (Index("ix_operations_time", "operation_time"),)
 
     def __init__(self, user_id: int, operation_value, operation_time, **kw: Any):
         super().__init__(**kw)
@@ -241,7 +274,7 @@ class Payments(Database.BASE):
     id = Column(Integer, primary_key=True)
     provider = Column(String(32), nullable=False, index=True)
     external_id = Column(String(128), nullable=False)
-    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="SET NULL"), nullable=True, index=True)
     amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(8), nullable=False)
     status = Column(String(16), nullable=False, default="pending")
@@ -249,17 +282,17 @@ class Payments(Database.BASE):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
-        UniqueConstraint('provider', 'external_id', name='uq_payment_provider_ext'),
-        Index('ix_payments_status_created', 'status', 'created_at'),
+        UniqueConstraint("provider", "external_id", name="uq_payment_provider_ext"),
+        Index("ix_payments_status_created", "status", "created_at"),
     )
 
 
 class ReferralEarnings(Database.BASE):
-    __tablename__ = 'referral_earnings'
+    __tablename__ = "referral_earnings"
 
     id = Column(Integer, primary_key=True)
-    referrer_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="CASCADE"), nullable=False, index=True)
-    referral_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete="CASCADE"), nullable=False, index=True)
+    referrer_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False, index=True)
+    referral_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False, index=True)
     amount = Column(Numeric(12, 2), nullable=False)
     original_amount = Column(Numeric(12, 2), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -268,19 +301,19 @@ class ReferralEarnings(Database.BASE):
         "User",
         foreign_keys="ReferralEarnings.referrer_id",
         back_populates="referral_earnings_received",
-        lazy='raise',
+        lazy="raise",
     )
     referral = relationship(
         "User",
         foreign_keys="ReferralEarnings.referral_id",
         back_populates="referral_earnings_generated",
-        lazy='raise',
+        lazy="raise",
     )
 
     __table_args__ = (
-        CheckConstraint('referrer_id != referral_id', name='ck_referral_earnings_no_self_referral'),
-        Index('ix_referral_earnings_referrer_created', 'referrer_id', 'created_at'),
-        Index('ix_referral_earnings_referral_created', 'referral_id', 'created_at'),
+        CheckConstraint("referrer_id != referral_id", name="ck_referral_earnings_no_self_referral"),
+        Index("ix_referral_earnings_referrer_created", "referrer_id", "created_at"),
+        Index("ix_referral_earnings_referral_created", "referral_id", "created_at"),
     )
 
     def __init__(self, referrer_id: int, referral_id: int, amount, original_amount, **kw: Any):
@@ -292,7 +325,7 @@ class ReferralEarnings(Database.BASE):
 
 
 class AuditLog(Database.BASE):
-    __tablename__ = 'audit_log'
+    __tablename__ = "audit_log"
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     level = Column(String(8), nullable=False, default="INFO")
@@ -304,17 +337,17 @@ class AuditLog(Database.BASE):
     ip_address = Column(String(45), nullable=True)
 
     __table_args__ = (
-        Index('ix_audit_log_timestamp', 'timestamp'),
-        Index('ix_audit_log_user_id', 'user_id'),
-        Index('ix_audit_log_action', 'action'),
+        Index("ix_audit_log_timestamp", "timestamp"),
+        Index("ix_audit_log_user_id", "user_id"),
+        Index("ix_audit_log_action", "action"),
     )
 
     def __repr__(self):
-        return f'<AuditLog {self.action} user={self.user_id} @ {self.timestamp}>'
+        return f"<AuditLog {self.action} user={self.user_id} @ {self.timestamp}>"
 
 
 class PromoCodes(Database.BASE):
-    __tablename__ = 'promo_codes'
+    __tablename__ = "promo_codes"
     id = Column(Integer, primary_key=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
     discount_type = Column(String(10), nullable=False)  # 'percent' | 'fixed'
@@ -322,63 +355,62 @@ class PromoCodes(Database.BASE):
     max_uses = Column(Integer, nullable=False, default=0)  # 0 = unlimited
     current_uses = Column(Integer, nullable=False, default=0)
     expires_at = Column(DateTime(timezone=True), nullable=True)
-    category_id = Column(Integer, ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)
-    item_id = Column(Integer, ForeignKey('goods.id', ondelete='SET NULL'), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    item_id = Column(Integer, ForeignKey("goods.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class PromoCodeUsages(Database.BASE):
-    __tablename__ = 'promo_code_usages'
+    __tablename__ = "promo_code_usages"
     id = Column(Integer, primary_key=True)
-    promo_id = Column(Integer, ForeignKey('promo_codes.id', ondelete='CASCADE'), nullable=False)
-    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False)
+    promo_id = Column(Integer, ForeignKey("promo_codes.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)
     used_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    __table_args__ = (UniqueConstraint('promo_id', 'user_id', name='uq_promo_usage_per_user'),)
+    __table_args__ = (UniqueConstraint("promo_id", "user_id", name="uq_promo_usage_per_user"),)
 
 
 class CartItems(Database.BASE):
-    __tablename__ = 'cart_items'
+    __tablename__ = "cart_items"
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False, index=True)
     item_name = Column(String(100), nullable=False)
     promo_code = Column(String(50), nullable=True)
     added_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
-
 class Reviews(Database.BASE):
-    __tablename__ = 'reviews'
+    __tablename__ = "reviews"
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False, index=True)
     item_name = Column(String(100), nullable=False, index=True)
     rating = Column(Integer, nullable=False)  # 1-5
     text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     __table_args__ = (
-        UniqueConstraint('user_id', 'item_name', name='uq_review_per_user_item'),
-        CheckConstraint('rating >= 1 AND rating <= 5', name='ck_review_rating_range'),
+        UniqueConstraint("user_id", "item_name", name="uq_review_per_user_item"),
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_review_rating_range"),
     )
 
 
 class BotSettings(Database.BASE):
-    __tablename__ = 'bot_settings'
+    __tablename__ = "bot_settings"
     key = Column(String(64), primary_key=True)
     value = Column(Text, nullable=False)
     description = Column(String(256), nullable=True)
 
-    def __init__(self, key: str, value: str, description: str = None, **kw: Any):
+    def __init__(self, key: str, value: str, description: str | None = None, **kw: Any):
         super().__init__(**kw)
         self.key = key
         self.value = value
         self.description = description
 
     def __repr__(self):
-        return f'<BotSettings {self.key}={self.value!r}>'
+        return f"<BotSettings {self.key}={self.value!r}>"
 
 
 _DEFAULT_SETTINGS = {
-    'menu_layout': ('1', 'Main menu button layout: comma-separated row sizes (e.g. "1" or "2" or "1,2")'),
+    "menu_layout": ("1", 'Main menu button layout: comma-separated row sizes (e.g. "1" or "2" or "1,2")'),
 }
 
 

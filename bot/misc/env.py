@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 _env_logger = logging.getLogger(__name__)
 
 
-class EnvKeys(ABC):
+class EnvKeys(ABC):  # noqa: B024
     """Secure environment configuration with validation"""
 
     @staticmethod
@@ -22,8 +22,8 @@ class EnvKeys(ABC):
         return os.getenv(key, default)
 
     # Telegram
-    TOKEN: Final = _get_required('TOKEN')
-    OWNER_ID: Final = int(_get_required('OWNER_ID'))
+    TOKEN: Final = _get_required("TOKEN")
+    OWNER_ID: Final = int(_get_required("OWNER_ID"))
 
     # Database
     POSTGRES_DB: Final = _get_required("POSTGRES_DB")
@@ -82,7 +82,9 @@ class EnvKeys(ABC):
     AUDIT_RETENTION_DAYS: Final = int(_get_optional("AUDIT_RETENTION_DAYS", "90"))
     PAYMENTS_RETENTION_DAYS: Final = int(_get_optional("PAYMENTS_RETENTION_DAYS", "90"))
 
-    DATABASE_URL: Final = f"postgresql+asyncpg://{POSTGRES_USER}:{quote_plus(POSTGRES_PASSWORD)}@{POSTGRES_HOST}:{DB_PORT}/{POSTGRES_DB}"
+    DATABASE_URL: Final = (
+        f"postgresql+asyncpg://{POSTGRES_USER}:{quote_plus(POSTGRES_PASSWORD)}@{POSTGRES_HOST}:{DB_PORT}/{POSTGRES_DB}"
+    )
 
     # Startup validation
     if ADMIN_PASSWORD == "admin":
@@ -97,8 +99,9 @@ class EnvKeys(ABC):
         )
     if int(MIN_AMOUNT) >= int(MAX_AMOUNT):
         _env_logger.warning(
-            "CONFIG: MIN_AMOUNT (%s) >= MAX_AMOUNT (%s). "
-            "Payment amounts will always be rejected.", MIN_AMOUNT, MAX_AMOUNT
+            "CONFIG: MIN_AMOUNT (%s) >= MAX_AMOUNT (%s). Payment amounts will always be rejected.",
+            MIN_AMOUNT,
+            MAX_AMOUNT,
         )
     if int(REFERRAL_PERCENT) < 0 or int(REFERRAL_PERCENT) > 99:
         _env_logger.warning(

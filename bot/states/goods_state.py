@@ -1,8 +1,9 @@
-from aiogram.filters.state import StatesGroup, State
+from aiogram.filters.state import State, StatesGroup
 
 
 class GoodsFSM(StatesGroup):
     """FSM for position (goods) and items management scenarios."""
+
     waiting_item_name_delete = State()
     waiting_item_name_show = State()
     waiting_bought_item_id = State()
@@ -18,6 +19,7 @@ class AddItemFSM(StatesGroup):
     5) mode (infinite or not),
     6) input product values (single / multiple).
     """
+
     waiting_item_name = State()
     waiting_item_description = State()
     waiting_item_price = State()
@@ -33,6 +35,7 @@ class UpdateItemFSM(StatesGroup):
     1) Add item values (stock) to an existing position.
     2) Full update (name, description, price, infinity/regular, values).
     """
+
     # Add values to an item
     waiting_item_name_for_amount_upd = State()
     waiting_item_values_upd = State()
@@ -45,4 +48,3 @@ class UpdateItemFSM(StatesGroup):
     waiting_make_infinity = State()
     waiting_single_value = State()
     waiting_multiple_values = State()
-

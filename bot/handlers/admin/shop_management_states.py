@@ -1,38 +1,51 @@
-from bot.handlers.user._helpers import edit_msg
 import asyncio
-from typing import Optional
-
-from aiogram import Router, F
-from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
-from aiogram.types import FSInputFile
-
-from pathlib import Path
 import datetime
+from pathlib import Path
 
-from bot.database.models import Permission
+from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, FSInputFile, Message
+
 from bot.database.methods import (
-    select_today_users, get_user_count, select_today_orders,
-    select_all_orders, select_today_operations, select_users_balance, select_all_operations,
-    select_count_items, select_count_goods, select_count_categories, select_count_bought_items,
-    select_bought_item, check_user_referrals, check_role_name_by_id, select_user_items,
-    select_user_operations, query_all_users, check_user_cached
+    check_role_name_by_id,
+    check_user_cached,
+    check_user_referrals,
+    get_user_count,
+    query_all_users,
+    select_all_operations,
+    select_all_orders,
+    select_bought_item,
+    select_count_bought_items,
+    select_count_categories,
+    select_count_goods,
+    select_count_items,
+    select_today_operations,
+    select_today_orders,
+    select_today_users,
+    select_user_items,
+    select_user_operations,
+    select_users_balance,
 )
-from bot.database.methods.read import (
-    get_roles_with_user_counts, select_unique_buyers, select_avg_order,
-    select_today_orders_count, select_blocked_users_count,
-)
-from bot.keyboards import back, simple_buttons, lazy_paginated_keyboard
-from bot.filters import HasPermissionFilter, HasAnyPermissionFilter
 from bot.database.methods.audit import log_audit
-from bot.misc import EnvKeys, LazyPaginator, sanitize_html, SearchQuery, StatsCache, get_cache_manager
+from bot.database.methods.read import (
+    get_roles_with_user_counts,
+    select_avg_order,
+    select_blocked_users_count,
+    select_today_orders_count,
+    select_unique_buyers,
+)
+from bot.database.models import Permission
+from bot.filters import HasAnyPermissionFilter, HasPermissionFilter
+from bot.handlers.user._helpers import edit_msg
 from bot.i18n import localize
+from bot.keyboards import back, lazy_paginated_keyboard, simple_buttons
+from bot.misc import EnvKeys, LazyPaginator, SearchQuery, StatsCache, get_cache_manager, sanitize_html
 from bot.states import GoodsFSM
 
 router = Router()
 
 # Initialize StatsCache as a global variable
-stats_cache: Optional[StatsCache] = None
+stats_cache: StatsCache | None = None
 
 
 def init_stats_cache():
@@ -44,15 +57,16 @@ def init_stats_cache():
         asyncio.create_task(stats_cache.warm_up_cache())
 
 
-@router.callback_query(F.data == "shop_management", HasAnyPermissionFilter(
-    permissions=Permission.CATALOG_MANAGE | Permission.STATS_VIEW
-))
+@router.callback_query(
+    F.data == "shop_management", HasAnyPermissionFilter(permissions=Permission.CATALOG_MANAGE | Permission.STATS_VIEW)
+)
 async def shop_callback_handler(call: CallbackQuery):
     """
     Open shop-management main menu.
     Shows only items the caller has permissions for.
     """
     from bot.database.methods import check_role_cached
+
     role = await check_role_cached(call.from_user.id) or 0
 
     actions = []
@@ -79,17 +93,17 @@ async def logs_callback_handler(call: CallbackQuery):
     # Check audit log file
     audit_file_path = Path(EnvKeys.BOT_AUDITFILE)
     if audit_file_path.exists() and audit_file_path.stat().st_size > 0:
-        files_to_send.append(('audit', audit_file_path))
+        files_to_send.append(("audit", audit_file_path))
 
     # Check bot log file
     bot_file_path = Path(EnvKeys.BOT_LOGFILE)
     if bot_file_path.exists() and bot_file_path.stat().st_size > 0:
-        files_to_send.append(('bot', bot_file_path))
+        files_to_send.append(("bot", bot_file_path))
 
     if files_to_send:
         for log_type, file_path in files_to_send:
             doc = FSInputFile(file_path, filename=file_path.name)
-            caption = localize("admin.shop.logs.caption") if log_type == 'audit' else f"{log_type.title()} log file"
+            caption = localize("admin.shop.logs.caption") if log_type == "audit" else f"{log_type.title()} log file"
             await call.message.bot.send_document(
                 chat_id=call.message.chat.id,
                 document=doc,
@@ -119,22 +133,22 @@ async def statistics_callback_handler(call: CallbackQuery):
 
         text = localize(
             "admin.shop.stats.template",
-            today_users=daily_stats['users'],
-            users=global_stats['total_users'],
+            today_users=daily_stats["users"],
+            users=global_stats["total_users"],
             buyers=unique_buyers,
             blocked=blocked_count,
-            today_orders=daily_stats['orders'],
+            today_orders=daily_stats["orders"],
             today_sold_count=today_sold_count,
-            all_orders=global_stats['total_revenue'],
+            all_orders=global_stats["total_revenue"],
             avg_order=f"{avg_order:.2f}",
-            today_topups=daily_stats['operations'],
+            today_topups=daily_stats["operations"],
             system_balance=await select_users_balance(),
             all_topups=await select_all_operations(),
-            items=global_stats['total_items'],
-            goods=global_stats['total_goods'],
+            items=global_stats["total_items"],
+            goods=global_stats["total_goods"],
             categories=await select_count_categories(),
             sold_count=await select_count_bought_items(),
-            currency=EnvKeys.PAY_CURRENCY
+            currency=EnvKeys.PAY_CURRENCY,
         )
 
     else:
@@ -156,7 +170,7 @@ async def statistics_callback_handler(call: CallbackQuery):
             goods=await select_count_goods(),
             categories=await select_count_categories(),
             sold_count=await select_count_bought_items(),
-            currency=EnvKeys.PAY_CURRENCY
+            currency=EnvKeys.PAY_CURRENCY,
         )
 
     # Append role breakdown
@@ -164,7 +178,7 @@ async def statistics_callback_handler(call: CallbackQuery):
     if roles:
         text += "\n" + localize("admin.shop.stats.roles_header")
         for r in roles:
-            perms_list = [label for bit, label in _PERM_LABELS.items() if r['permissions'] & bit]
+            perms_list = [label for bit, label in _PERM_LABELS.items() if r["permissions"] & bit]
             perms_str = ", ".join(perms_list) if perms_list else "—"
             text += f"\n◾<b>{r['name']}</b> ({perms_str}): {r['user_count']}"
 
@@ -220,7 +234,7 @@ async def navigate_users(call: CallbackQuery, state: FSMContext):
 
     # Get saved state
     data = await state.get_data()
-    paginator_state = data.get('users_paginator')
+    paginator_state = data.get("users_paginator")
 
     # Create paginator with cached state
     paginator = LazyPaginator(query_all_users, per_page=10, state=paginator_state)
@@ -254,8 +268,8 @@ async def show_user_info(call: CallbackQuery):
     operations = await select_user_operations(user_id)
     overall_balance = sum(operations) if operations else 0
     items = await select_user_items(user_id)
-    role = await check_role_name_by_id(user.get('role_id'))
-    referrals = await check_user_referrals(user.get('telegram_id'))
+    role = await check_role_name_by_id(user.get("role_id"))
+    referrals = await check_user_referrals(user.get("telegram_id"))
 
     text = (
         f"{localize('profile.caption', name=user_info.first_name, id=user_id)}\n\n"
@@ -277,7 +291,8 @@ async def show_bought_item_callback_handler(call: CallbackQuery, state: FSMConte
     """
     Ask for purchased item's unique ID to search.
     """
-    await edit_msg(call.message, 
+    await edit_msg(
+        call.message,
         localize("admin.shop.bought.prompt_id"),
         reply_markup=back("shop_management"),
     )
@@ -289,25 +304,19 @@ async def process_item_show(message: Message, state: FSMContext):
     """Show purchased item details by unique ID."""
     try:
         # Validate search query
-        search_query = SearchQuery(
-            query=message.text.strip(),
-            limit=1
-        )
+        search_query = SearchQuery(query=message.text.strip(), limit=1)
 
         # Sanitize and validate ID
         msg = search_query.sanitize_query(search_query.query)
 
         if not msg.isdigit():
-            await message.answer(
-                localize("errors.id_should_be_number"),
-                reply_markup=back("show_bought_item")
-            )
+            await message.answer(localize("errors.id_should_be_number"), reply_markup=back("show_bought_item"))
             return
 
         item = await select_bought_item(int(msg))
         if item:
             # Sanitize output values
-            safe_value = sanitize_html(item['value'])
+            safe_value = sanitize_html(item["value"])
 
             text = (
                 f"{localize('purchases.item.name', name=item['item_name'])}\n"
@@ -319,16 +328,10 @@ async def process_item_show(message: Message, state: FSMContext):
             )
             await message.answer(text, parse_mode="HTML", reply_markup=back("show_bought_item"))
         else:
-            await message.answer(
-                localize("admin.shop.bought.not_found"),
-                reply_markup=back("show_bought_item")
-            )
+            await message.answer(localize("admin.shop.bought.not_found"), reply_markup=back("show_bought_item"))
 
     except Exception as e:
-        await message.answer(
-            localize("errors.invalid_data"),
-            reply_markup=back("show_bought_item")
-        )
+        await message.answer(localize("errors.invalid_data"), reply_markup=back("show_bought_item"))
         await log_audit("search_error", level="ERROR", details=str(e))
 
     await state.clear()

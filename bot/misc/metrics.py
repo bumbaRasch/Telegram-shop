@@ -1,7 +1,7 @@
 import time
-from datetime import datetime
-from typing import Dict, Any, Optional, List
 from collections import defaultdict
+from datetime import datetime
+from typing import Any
 
 from bot.logger_mesh import logger
 
@@ -11,15 +11,14 @@ class MetricsCollector:
 
     def __init__(self):
         # Initializing all attributes
-        self.events: Dict[str, int] = defaultdict(int)
-        self.timings: Dict[str, List[float]] = defaultdict(list)
-        self.errors: Dict[str, int] = defaultdict(int)
-        self.conversions: Dict[str, Dict] = {}
+        self.events: dict[str, int] = defaultdict(int)
+        self.timings: dict[str, list[float]] = defaultdict(list)
+        self.errors: dict[str, int] = defaultdict(int)
+        self.conversions: dict[str, dict] = {}
         self.start_time = datetime.now()
         self.last_flush = datetime.now()
 
-    def track_event(self, event_name: str, user_id: Optional[int] = None,
-                    metadata: Optional[Dict] = None):
+    def track_event(self, event_name: str, user_id: int | None = None, metadata: dict | None = None):
         """Event Tracking"""
         self.events[event_name] += 1
 
@@ -31,7 +30,7 @@ class MetricsCollector:
         if len(self.timings[operation]) > 1000:
             self.timings[operation] = self.timings[operation][-1000:]
 
-    def track_error(self, error_type: str, error_msg: str = None):
+    def track_error(self, error_type: str, error_msg: str | None = None):
         """Error Tracking"""
         self.errors[error_type] += 1
 
@@ -45,7 +44,7 @@ class MetricsCollector:
 
         self.conversions[funnel][step].add(user_id)
 
-    def get_metrics_summary(self) -> Dict[str, Any]:
+    def get_metrics_summary(self) -> dict[str, Any]:
         """Getting a metrics summary"""
         uptime = (datetime.now() - self.start_time).total_seconds()
 
@@ -57,7 +56,7 @@ class MetricsCollector:
                     "avg": sum(times) / len(times),
                     "min": min(times),
                     "max": max(times),
-                    "count": len(times)
+                    "count": len(times),
                 }
 
         # Conversion calculation
@@ -71,7 +70,7 @@ class MetricsCollector:
                 conversion_rates[funnel] = {
                     "view_to_item": (view_item / view_shop * 100) if view_shop else 0,
                     "item_to_purchase": (purchase / view_item * 100) if view_item else 0,
-                    "total": (purchase / view_shop * 100) if view_shop else 0
+                    "total": (purchase / view_shop * 100) if view_shop else 0,
                 }
 
         return {
@@ -80,7 +79,7 @@ class MetricsCollector:
             "timings": avg_timings,
             "errors": dict(self.errors),
             "conversions": conversion_rates,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     def export_to_prometheus(self):
@@ -107,7 +106,7 @@ class MetricsCollector:
 
         # Add uptime
         uptime = (datetime.now() - self.start_time).total_seconds()
-        lines.append(f'bot_uptime_seconds {uptime}')
+        lines.append(f"bot_uptime_seconds {uptime}")
 
         return "\n".join(lines)
 
@@ -126,7 +125,7 @@ class AnalyticsMiddleware:
         event_type = None
 
         try:
-            if hasattr(event, 'from_user') and event.from_user:
+            if hasattr(event, "from_user") and event.from_user:
                 user_id = event.from_user.id
         except AttributeError:
             # from_user may not exist or may be deleted
@@ -135,17 +134,17 @@ class AnalyticsMiddleware:
         # Determine event type - check attributes but handle test mocks properly
         try:
             # Try to access text attribute to see if it exists and has a value
-            text_value = getattr(event, 'text', None)
+            text_value = getattr(event, "text", None)
             if text_value is not None and text_value != "":
                 event_type = "message"
-                if text_value and text_value.startswith('/'):
+                if text_value and text_value.startswith("/"):
                     event_type = f"command_{text_value.split()[0][1:]}"
-            elif hasattr(event, 'data'):  # CallbackQuery (including data=None)
-                event_type = event.data.split('_')[0] if event.data else "unknown"
+            elif hasattr(event, "data"):  # CallbackQuery (including data=None)
+                event_type = event.data.split("_")[0] if event.data else "unknown"
         except AttributeError:
             # If we can't access text (deleted attribute), check for data
-            if hasattr(event, 'data'):
-                event_type = event.data.split('_')[0] if event.data else "unknown"
+            if hasattr(event, "data"):
+                event_type = event.data.split("_")[0] if event.data else "unknown"
 
         # Event Tracking
         if event_type:
@@ -168,10 +167,10 @@ class AnalyticsMiddleware:
 
 
 # Global instance of metrics
-_metrics_collector: Optional[MetricsCollector] = None
+_metrics_collector: MetricsCollector | None = None
 
 
-def get_metrics() -> Optional[MetricsCollector]:
+def get_metrics() -> MetricsCollector | None:
     """Getting a global metrics collector"""
     return _metrics_collector
 

@@ -1,15 +1,16 @@
 import logging
 import time
-from typing import Dict, Any, Callable, Awaitable
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, CallbackQuery, TelegramObject
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
-from bot.i18n import localize
 from bot.database.models import Permission
+from bot.i18n import localize
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +18,19 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RateLimitConfig:
     """Configuration for rate limiting"""
+
     # Global limits
     global_limit: int = 30  # requests
     global_window: int = 60  # seconds
 
     # Limits for specific actions
-    action_limits: dict = field(default_factory=lambda: {
-        'payment': (10, 60),  # 10 times a minute
-        'shop_view': (60, 60),  # 60 times per minute
-        'buy_item': (5, 60),  # 5 buys a minute
-    })
+    action_limits: dict = field(
+        default_factory=lambda: {
+            "payment": (10, 60),  # 10 times a minute
+            "shop_view": (60, 60),  # 60 times per minute
+            "buy_item": (5, 60),  # 5 buys a minute
+        }
+    )
 
     # Temporary ban after exceeding
     ban_duration: int = 300  # 5 minutes
@@ -40,9 +44,9 @@ class RateLimiter:
 
     def __init__(self, config: RateLimitConfig):
         self.config = config
-        self.user_requests: Dict[int, list] = defaultdict(list)
-        self.user_actions: Dict[str, Dict[int, list]] = defaultdict(lambda: defaultdict(list))
-        self.banned_users: Dict[int, float] = {}
+        self.user_requests: dict[int, list] = defaultdict(list)
+        self.user_actions: dict[str, dict[int, list]] = defaultdict(lambda: defaultdict(list))
+        self.banned_users: dict[int, float] = {}
 
     def _clean_old_requests(self, requests: list, window: int) -> list:
         """Clears old requests outside the window"""
@@ -70,10 +74,7 @@ class RateLimiter:
         current_time = time.time()
 
         # Clearing old requests
-        self.user_requests[user_id] = self._clean_old_requests(
-            self.user_requests[user_id],
-            self.config.global_window
-        )
+        self.user_requests[user_id] = self._clean_old_requests(self.user_requests[user_id], self.config.global_window)
 
         # Remove empty key to prevent memory leak
         if not self.user_requests[user_id]:
@@ -96,10 +97,7 @@ class RateLimiter:
         current_time = time.time()
 
         # Clear old requests for this action
-        self.user_actions[action][user_id] = self._clean_old_requests(
-            self.user_actions[action][user_id],
-            window
-        )
+        self.user_actions[action][user_id] = self._clean_old_requests(self.user_actions[action][user_id], window)
 
         # Remove empty keys to prevent memory leak
         if not self.user_actions[action][user_id]:
@@ -116,7 +114,7 @@ class RateLimiter:
         self.user_actions[action][user_id].append(current_time)
         return True
 
-    def get_wait_time(self, user_id: int, action: str = None) -> int:
+    def get_wait_time(self, user_id: int, action: str | None = None) -> int:
         """Returns the wait time until the next available request"""
         if self.is_banned(user_id):
             ban_time = self.banned_users[user_id]
@@ -147,12 +145,12 @@ class RateLimitMiddleware(BaseMiddleware):
         self.auth_middleware = auth_middleware
         self.action_mapping = {
             # Callback data -> action name
-            'replenish_balance': 'top_up',
-            'pay_': 'payment',
-            'buy_': 'buy_item',
-            'shop': 'shop_view',
-            'category_': 'shop_view',
-            'item_': 'shop_view',
+            "replenish_balance": "top_up",
+            "pay_": "payment",
+            "buy_": "buy_item",
+            "shop": "shop_view",
+            "category_": "shop_view",
+            "item_": "shop_view",
         }
 
     def _get_action_from_event(self, event: TelegramObject) -> str:
@@ -165,12 +163,12 @@ class RateLimitMiddleware(BaseMiddleware):
 
         elif isinstance(event, Message):
             text = event.text or ""
-            if text.startswith('/start'):
-                return 'shop_view'
-            elif text.startswith('/'):
-                return 'admin_action'
+            if text.startswith("/start"):
+                return "shop_view"
+            elif text.startswith("/"):
+                return "admin_action"
 
-        return 'default'
+        return "default"
 
     async def _check_admin_bypass(self, user_id: int) -> bool:
         """Checks if the user is an admin (delegates to AuthenticationMiddleware cache)"""
@@ -182,16 +180,17 @@ class RateLimitMiddleware(BaseMiddleware):
                 role = await self.auth_middleware.get_user_role_cached(user_id)
             else:
                 from bot.database.methods import check_role
+
                 role = await check_role(user_id) or 0
             return Permission.has_any_admin_perm(role)
         except Exception:
             return False
 
     async def __call__(
-            self,
-            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-            event: TelegramObject,
-            data: Dict[str, Any]
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
     ) -> Any:
         """Basic middleware logic"""
 
@@ -212,15 +211,10 @@ class RateLimitMiddleware(BaseMiddleware):
             wait_time = self.limiter.get_wait_time(user_id)
 
             if isinstance(event, CallbackQuery):
-                await event.answer(
-                    localize("middleware.ban", time=wait_time),
-                    show_alert=True
-                )
+                await event.answer(localize("middleware.ban", time=wait_time), show_alert=True)
                 return None
             elif isinstance(event, Message):
-                await event.answer(
-                    localize("middleware.ban", time=wait_time)
-                )
+                await event.answer(localize("middleware.ban", time=wait_time))
                 return None
 
         # Check bypass for admins
@@ -235,10 +229,7 @@ class RateLimitMiddleware(BaseMiddleware):
             self.limiter.ban_user(user_id)
 
             if isinstance(event, CallbackQuery):
-                await event.answer(
-                    localize("middleware.above_limits"),
-                    show_alert=True
-                )
+                await event.answer(localize("middleware.above_limits"), show_alert=True)
             elif isinstance(event, Message):
                 await event.answer(localize("middleware.above_limits"))
             return None
@@ -247,10 +238,7 @@ class RateLimitMiddleware(BaseMiddleware):
             wait_time = self.limiter.get_wait_time(user_id, action)
 
             if isinstance(event, CallbackQuery):
-                await event.answer(
-                    localize("middleware.waiting", time=wait_time),
-                    show_alert=True
-                )
+                await event.answer(localize("middleware.waiting", time=wait_time), show_alert=True)
             elif isinstance(event, Message):
                 try:
                     await event.answer(localize("middleware.waiting", time=wait_time))

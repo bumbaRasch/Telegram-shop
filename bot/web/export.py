@@ -1,15 +1,14 @@
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from starlette.requests import Request
-from starlette.responses import StreamingResponse, JSONResponse
-from starlette.routing import Route
 from sqlalchemy import select
+from starlette.requests import Request
+from starlette.responses import JSONResponse, StreamingResponse
+from starlette.routing import Route
 
 from bot.database.main import Database
-from bot.database.models.main import User, BoughtGoods, Operations, Payments
-
+from bot.database.models.main import BoughtGoods, Operations, Payments, User
 
 BATCH_SIZE = 1000
 
@@ -51,12 +50,12 @@ def _parse_date_params(request: Request):
     to_date = None
     if from_str:
         try:
-            from_date = datetime.strptime(from_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            from_date = datetime.strptime(from_str, "%Y-%m-%d").replace(tzinfo=UTC)
         except ValueError:
             pass
     if to_str:
         try:
-            to_date = datetime.strptime(to_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            to_date = datetime.strptime(to_str, "%Y-%m-%d").replace(tzinfo=UTC)
         except ValueError:
             pass
     return from_date, to_date
@@ -72,8 +71,7 @@ async def export_users(request: Request):
 
     from_date, to_date = _parse_date_params(request)
     query = select(
-        User.telegram_id, User.balance, User.role_id,
-        User.referral_id, User.registration_date, User.is_blocked
+        User.telegram_id, User.balance, User.role_id, User.referral_id, User.registration_date, User.is_blocked
     ).order_by(User.telegram_id)
 
     if from_date:
@@ -96,8 +94,12 @@ async def export_purchases(request: Request):
 
     from_date, to_date = _parse_date_params(request)
     query = select(
-        BoughtGoods.id, BoughtGoods.item_name, BoughtGoods.price,
-        BoughtGoods.buyer_id, BoughtGoods.bought_datetime, BoughtGoods.unique_id
+        BoughtGoods.id,
+        BoughtGoods.item_name,
+        BoughtGoods.price,
+        BoughtGoods.buyer_id,
+        BoughtGoods.bought_datetime,
+        BoughtGoods.unique_id,
     ).order_by(BoughtGoods.id)
 
     if from_date:
@@ -119,10 +121,9 @@ async def export_operations(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     from_date, to_date = _parse_date_params(request)
-    query = select(
-        Operations.id, Operations.user_id, Operations.operation_value,
-        Operations.operation_time
-    ).order_by(Operations.id)
+    query = select(Operations.id, Operations.user_id, Operations.operation_value, Operations.operation_time).order_by(
+        Operations.id
+    )
 
     if from_date:
         query = query.where(Operations.operation_time >= from_date)
@@ -144,9 +145,14 @@ async def export_payments(request: Request):
 
     from_date, to_date = _parse_date_params(request)
     query = select(
-        Payments.id, Payments.provider, Payments.external_id,
-        Payments.user_id, Payments.amount, Payments.currency,
-        Payments.status, Payments.created_at
+        Payments.id,
+        Payments.provider,
+        Payments.external_id,
+        Payments.user_id,
+        Payments.amount,
+        Payments.currency,
+        Payments.status,
+        Payments.created_at,
     ).order_by(Payments.id)
 
     if from_date:

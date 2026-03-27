@@ -1,27 +1,26 @@
 import asyncio
+import json
 import logging
 import sys
-import json
 from pathlib import Path
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 
-from bot.database.methods import check_category_cached
-from bot.handlers.admin.shop_management_states import init_stats_cache
-from bot.misc import EnvKeys
-from bot.handlers import register_all_handlers
-from bot.database.models import register_models
-from bot.logger_mesh import configure_logging
-from bot.middleware import setup_rate_limiting, RateLimitConfig
-from bot.middleware.security import SecurityMiddleware, AuthenticationMiddleware
-from bot.misc.caching import init_cache_manager, get_cache_manager
-from bot.misc.caching import CacheScheduler
-from bot.misc.caching import get_redis_storage
-from bot.misc.services import RecoveryManager, CleanupManager
-from bot.misc.metrics import init_metrics, get_metrics, AnalyticsMiddleware
 from bot.database.main import Database as _Database
+from bot.database.methods import check_category_cached
+from bot.database.models import register_models
+from bot.handlers import register_all_handlers
+from bot.handlers.admin.shop_management_states import init_stats_cache
+from bot.logger_mesh import configure_logging
+from bot.middleware import RateLimitConfig, setup_rate_limiting
+from bot.middleware.security import AuthenticationMiddleware, SecurityMiddleware
+from bot.misc import EnvKeys
+from bot.misc.caching import CacheScheduler, get_cache_manager, get_redis_storage, init_cache_manager
+from bot.misc.metrics import AnalyticsMiddleware, get_metrics, init_metrics
+from bot.misc.services import CleanupManager, RecoveryManager
 
 # Global variables for components
 recovery_manager = None
@@ -57,11 +56,11 @@ async def __on_start_up(dp: Dispatcher, bot: Bot) -> None:
         ban_duration=300,
         admin_bypass=True,
         action_limits={
-            'payment': (10, 60),  # 10 times per minute
-            'shop_view': (60, 60),  # 60 times per minute
-            'buy_item': (5, 60),  # 5 purchases per minute
-            'top_up': (5, 300),  # 5 top-ups in 5 minutes
-        }
+            "payment": (10, 60),  # 10 times per minute
+            "shop_view": (60, 60),  # 60 times per minute
+            "buy_item": (5, 60),  # 5 purchases per minute
+            "top_up": (5, 300),  # 5 top-ups in 5 minutes
+        },
     )
     global rate_limit_middleware
     rate_limit_middleware = setup_rate_limiting(dp, rate_config, auth_middleware=auth_middleware)
@@ -113,6 +112,7 @@ async def __on_start_up(dp: Dispatcher, bot: Bot) -> None:
 
     # Start the admin web server
     import uvicorn
+
     from bot.web import create_admin_app
 
     admin_app = create_admin_app()
@@ -165,6 +165,7 @@ async def __on_shutdown(dp: Dispatcher, bot: Bot) -> None:
 
     # Close CryptoPay shared HTTP session
     from bot.misc.services.payment import CryptoPayAPI
+
     await CryptoPayAPI.close_session()
 
     # Close database engine
@@ -175,10 +176,7 @@ async def __on_shutdown(dp: Dispatcher, bot: Bot) -> None:
 
 async def warm_up_critical_caches():
     """Warming of critical caches at startup"""
-    from bot.database.methods.read import (
-        get_user_count_cached,
-        select_admins_cached
-    )
+    from bot.database.methods.read import get_user_count_cached, select_admins_cached
 
     cache_manager = get_cache_manager()
     if not cache_manager:
@@ -191,6 +189,7 @@ async def warm_up_critical_caches():
 
         # Warming up popular categories and products
         from bot.database.methods import query_categories
+
         categories = await query_categories(limit=5)
         for category in categories:
             await check_category_cached(category)
@@ -204,17 +203,11 @@ async def start_bot() -> None:
     """Start the bot with enhanced security and monitoring"""
 
     # Logging Configuration
-    configure_logging(
-        console=EnvKeys.LOG_TO_STDOUT == "1",
-        debug=EnvKeys.DEBUG == "1"
-    )
+    configure_logging(console=EnvKeys.LOG_TO_STDOUT == "1", debug=EnvKeys.DEBUG == "1")
 
     # Root-logger fallback for third-party libraries (sqlalchemy, uvicorn, etc.)
     log_level = logging.DEBUG if EnvKeys.DEBUG == "1" else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
     # Checking critical environment variables
@@ -230,8 +223,7 @@ async def start_bot() -> None:
     storage = get_redis_storage() or MemoryStorage()
     if isinstance(storage, MemoryStorage):
         logging.warning(
-            "Using MemoryStorage - FSM states will be lost on restart! "
-            "Consider setting up Redis for production."
+            "Using MemoryStorage - FSM states will be lost on restart! Consider setting up Redis for production."
         )
 
     # Creating a dispatcher
@@ -239,12 +231,12 @@ async def start_bot() -> None:
 
     # Create and run the bot
     async with Bot(
-            token=EnvKeys.TOKEN,
-            default=DefaultBotProperties(
-                parse_mode="HTML",
-                link_preview_is_disabled=False,
-                protect_content=False,
-            ),
+        token=EnvKeys.TOKEN,
+        default=DefaultBotProperties(
+            parse_mode="HTML",
+            link_preview_is_disabled=False,
+            protect_content=False,
+        ),
     ) as bot:
         # Getting information about the bot
         bot_info = await bot.get_me()
@@ -253,12 +245,7 @@ async def start_bot() -> None:
         # Initialization at startup
         await __on_start_up(dp, bot)
 
-        allowed_updates = [
-            "message",
-            "callback_query",
-            "pre_checkout_query",
-            "successful_payment"
-        ]
+        allowed_updates = ["message", "callback_query", "pre_checkout_query", "successful_payment"]
 
         try:
             global webhook_active
@@ -276,7 +263,6 @@ async def start_bot() -> None:
                 logging.info(f"Webhook set: {webhook_url}")
 
                 # Add webhook handler to admin app
-                from aiogram.webhook.aiohttp_server import SimpleRequestHandler
                 from starlette.requests import Request
                 from starlette.responses import Response
 
@@ -290,16 +276,16 @@ async def start_bot() -> None:
 
                     body = await request.body()
                     from aiogram.types import Update
+
                     update = Update.model_validate_raw(body)
                     await dp.feed_update(bot=bot, update=update)
                     return Response(status_code=200)
 
                 from starlette.routing import Route
+
                 # We need to add the route to the admin app before it starts
                 # The admin_server is already running, so we patch the app
-                admin_server.config.app.routes.append(
-                    Route(webhook_path, webhook_handler, methods=["POST"])
-                )
+                admin_server.config.app.routes.append(Route(webhook_path, webhook_handler, methods=["POST"]))
 
                 # Keep the process running
                 await asyncio.Event().wait()
