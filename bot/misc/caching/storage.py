@@ -4,8 +4,6 @@ from typing import Literal
 from aiogram.fsm.storage.redis import RedisStorage, StorageKey
 from redis.asyncio import Redis
 
-from bot.misc import EnvKeys
-
 
 class CustomRedisStorage(RedisStorage):
     """
@@ -48,6 +46,8 @@ def get_redis_storage() -> RedisStorage | None:
     Create Redis storage with proper configuration.
     Returns None if Redis is disabled or not available.
     """
+    from bot.misc import EnvKeys  # late import — avoids circular dependency
+
     if EnvKeys.REDIS_ENABLED != "1":
         logging.info("Redis is disabled via REDIS_ENABLED=0")
         return None
