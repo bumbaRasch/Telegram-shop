@@ -1,4 +1,5 @@
 from bot.handlers.user._helpers import edit_msg
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -59,10 +60,16 @@ async def broadcast_messages(message: Message, state: FSMContext):
             reply_markup=back("send_message")
         )
 
-        # Progress update function
-        async def update_progress(stats: BroadcastStats):
-            progress = (stats.sent + stats.failed) / stats.total * 100
+        # Progress update function — throttled to at most once every 2 seconds
+        _last_progress = [0.0]
 
+        async def update_progress(stats: BroadcastStats):
+            now = time.monotonic()
+            if now - _last_progress[0] < 2.0:
+                return
+            _last_progress[0] = now
+
+            progress = (stats.sent + stats.failed) / stats.total * 100
             try:
                 await progress_msg.edit_text(
                     localize("broadcast.progress",

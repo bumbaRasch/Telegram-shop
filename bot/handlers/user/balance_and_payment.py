@@ -307,7 +307,13 @@ async def checking_payment(call: CallbackQuery, state: FSMContext):
         elif status == "active":
             await call.answer(localize("payments.not_paid_yet"))
         else:
-            await call.answer(localize("payments.expired"), show_alert=True)
+            # Invoice expired or unknown status — clear state so user isn't stuck
+            await state.clear()
+            await edit_msg(
+                call.message,
+                localize("payments.expired"),
+                back('profile'),
+            )
 
 
 @router.pre_checkout_query()

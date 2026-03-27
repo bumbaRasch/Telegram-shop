@@ -1,4 +1,5 @@
 from bot.handlers.user._helpers import edit_msg
+import asyncio
 from decimal import Decimal
 from functools import partial
 
@@ -46,14 +47,27 @@ async def _build_user_profile(bot, target_id: int, caller_perms: int = 0):
         return None
 
     fallback = user.get('first_name') or user.get('username') or str(target_id)
-    display_name = await _safe_get_name(bot, target_id, fallback)
-    operations = await select_user_operations(target_id)
-    overall_balance = sum(operations) if operations else 0
-    items_count = await select_user_items(target_id)
-    role = await check_role_name_by_id(user.get('role_id'))
-    referrals = await check_user_referrals(user.get('telegram_id'))
 
-    earnings_stats = await get_referral_earnings_stats(target_id)
+    # Run all independent queries concurrently
+    (
+        display_name,
+        operations,
+        items_count,
+        role,
+        referrals,
+        earnings_stats,
+        blocked,
+    ) = await asyncio.gather(
+        _safe_get_name(bot, target_id, fallback),
+        select_user_operations(target_id),
+        select_user_items(target_id),
+        check_role_name_by_id(user.get('role_id')),
+        check_user_referrals(user.get('telegram_id')),
+        get_referral_earnings_stats(target_id),
+        is_user_blocked(target_id),
+    )
+
+    overall_balance = sum(operations) if operations else 0
     has_referrals = referrals > 0
     has_earnings = earnings_stats['total_earnings_count'] > 0
 
@@ -69,7 +83,7 @@ async def _build_user_profile(bot, target_id: int, caller_perms: int = 0):
         actions.append((localize('btn.admin.deduct_user'), f"deduct-user-balance_{target_id}"))
 
     if role_name != 'OWNER':
-        if await is_user_blocked(target_id):
+        if blocked:
             actions.append((localize('btn.admin.unblock'), f"unblock-user_{target_id}"))
         else:
             actions.append((localize('btn.admin.block'), f"block-user_{target_id}"))
@@ -99,7 +113,7 @@ async def _build_user_profile(bot, target_id: int, caller_perms: int = 0):
         localize('profile.registration_date', dt=user.get('registration_date')),
     ]
 
-    if await is_user_blocked(target_id):
+    if blocked:
         lines.append(localize('admin.users.status.blocked'))
 
     if has_earnings:

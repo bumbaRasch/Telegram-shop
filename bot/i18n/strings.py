@@ -484,6 +484,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # === Errors ===
         "errors.not_subscribed": "Вы не подписались",
         "errors.something_wrong": "❌ Что-то пошло не так. Попробуйте ещё раз.",
+        "errors.general_error": "❌ Ошибка: {e}",
         "errors.pagination_invalid": "Некорректные данные пагинации",
         "errors.invalid_data": "❌ Неправильные данные",
         "errors.id_should_be_number": "❌ ID должен быть числом.",
