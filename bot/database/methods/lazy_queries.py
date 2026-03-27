@@ -2,6 +2,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy import desc
 from bot.database import Database
+from bot.constants import DEFAULT_PAGE_SIZE
 from bot.database.models import (
     Categories, Goods, User, BoughtGoods, ItemValues,
     ReferralEarnings, Role, Operations
@@ -9,7 +10,7 @@ from bot.database.models import (
 from bot.database.models.main import PromoCodes, Reviews
 
 
-async def query_categories(offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
+async def query_categories(offset: int = 0, limit: int = DEFAULT_PAGE_SIZE, count_only: bool = False) -> Any:
     """Query categories with pagination"""
     async with Database().session() as s:
         if count_only:
@@ -23,7 +24,7 @@ async def query_categories(offset: int = 0, limit: int = 10, count_only: bool = 
         return [row[0] for row in result.all()]
 
 
-async def query_items_in_category(category_name: str, offset: int = 0, limit: int = 10,
+async def query_items_in_category(category_name: str, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE,
                                   count_only: bool = False) -> Any:
     """Query items in category with pagination"""
     async with Database().session() as s:
@@ -42,7 +43,7 @@ async def query_items_in_category(category_name: str, offset: int = 0, limit: in
         return [row[0] for row in result.all()]
 
 
-async def query_user_bought_items(user_id: int, offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
+async def query_user_bought_items(user_id: int, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE, count_only: bool = False) -> Any:
     """Query user's bought items with pagination"""
     async with Database().session() as s:
         if count_only:
@@ -59,7 +60,7 @@ async def query_user_bought_items(user_id: int, offset: int = 0, limit: int = 10
         return result.scalars().all()
 
 
-async def query_all_users(offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
+async def query_all_users(offset: int = 0, limit: int = DEFAULT_PAGE_SIZE, count_only: bool = False) -> Any:
     """Query all users with pagination, returning id + username/first_name"""
     async with Database().session() as s:
         if count_only:
@@ -76,7 +77,7 @@ async def query_all_users(offset: int = 0, limit: int = 10, count_only: bool = F
         ]
 
 
-async def query_items_in_position(item_name: str, offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
+async def query_items_in_position(item_name: str, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE, count_only: bool = False) -> Any:
     """Query items in position with pagination"""
     async with Database().session() as s:
         item_id = (await s.execute(
@@ -94,7 +95,7 @@ async def query_items_in_position(item_name: str, offset: int = 0, limit: int = 
         return [row[0] for row in result.all()]
 
 
-async def query_user_referrals(user_id: int, offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
+async def query_user_referrals(user_id: int, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE, count_only: bool = False) -> Any:
     """Query user's referrals with earnings info"""
     async with Database().session() as s:
         if count_only:
@@ -136,7 +137,7 @@ async def query_user_referrals(user_id: int, offset: int = 0, limit: int = 10, c
         ]
 
 
-async def query_referral_earnings_from_user(referrer_id: int, referral_id: int, offset: int = 0, limit: int = 10,
+async def query_referral_earnings_from_user(referrer_id: int, referral_id: int, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE,
                                             count_only: bool = False) -> Any:
     """Query earnings from specific referral"""
     async with Database().session() as s:
@@ -153,7 +154,7 @@ async def query_referral_earnings_from_user(referrer_id: int, referral_id: int, 
         return result.scalars().all()
 
 
-async def query_all_referral_earnings(referrer_id: int, offset: int = 0, limit: int = 10,
+async def query_all_referral_earnings(referrer_id: int, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE,
                                       count_only: bool = False) -> Any:
     """Query all referral earnings for user"""
     async with Database().session() as s:
@@ -169,7 +170,7 @@ async def query_all_referral_earnings(referrer_id: int, offset: int = 0, limit: 
         return result.scalars().all()
 
 
-async def query_promo_codes(offset: int = 0, limit: int = 10, count_only: bool = False) -> Any:
+async def query_promo_codes(offset: int = 0, limit: int = DEFAULT_PAGE_SIZE, count_only: bool = False) -> Any:
     """Query promo codes with pagination"""
     async with Database().session() as s:
         if count_only:
@@ -193,7 +194,7 @@ async def query_promo_codes(offset: int = 0, limit: int = 10, count_only: bool =
 
 
 
-async def query_user_operations_history(user_id: int, offset: int = 0, limit: int = 10,
+async def query_user_operations_history(user_id: int, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE,
                                         count_only: bool = False) -> Any:
     """Query user's full operations history (topups, purchases, referral bonuses) as UNION ALL"""
     from sqlalchemy import literal_column, union_all, literal
@@ -248,7 +249,7 @@ async def query_user_operations_history(user_id: int, offset: int = 0, limit: in
         ]
 
 
-async def query_item_reviews(item_name: str, offset: int = 0, limit: int = 10,
+async def query_item_reviews(item_name: str, offset: int = 0, limit: int = DEFAULT_PAGE_SIZE,
                              count_only: bool = False) -> Any:
     """Query reviews for an item with pagination"""
     async with Database().session() as s:

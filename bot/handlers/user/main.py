@@ -1,11 +1,13 @@
+import functools
+
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.enums.chat_type import ChatType
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import datetime
-import os
 
 from bot.handlers.user._helpers import edit_msg, edit_media_msg, get_photo, cache_photo, MENU_PHOTO_PATH
 
@@ -18,7 +20,7 @@ from bot.database.methods.lazy_queries import query_user_operations_history
 from bot.handlers.other import check_sub_channel, _parse_channel_username
 from bot.keyboards import main_menu, back, profile_keyboard, check_sub
 from bot.keyboards.inline import simple_buttons, lazy_paginated_keyboard
-from bot.misc import EnvKeys
+from bot.misc import EnvKeys, LazyPaginator
 from bot.misc.metrics import get_metrics
 from bot.i18n import localize
 from bot.logger_mesh import logger
@@ -201,10 +203,7 @@ async def navigate_operations(call: CallbackQuery, state: FSMContext):
 
 
 async def _show_operations_page(call: CallbackQuery, state: FSMContext, user_id: int, page: int):
-    from functools import partial
-    from bot.misc import LazyPaginator
-
-    paginator = LazyPaginator(partial(query_user_operations_history, user_id), per_page=10)
+    paginator = LazyPaginator(functools.partial(query_user_operations_history, user_id), per_page=10)
     items = await paginator.get_page(page)
     total_pages = await paginator.get_total_pages()
 
@@ -228,8 +227,6 @@ async def _show_operations_page(call: CallbackQuery, state: FSMContext, user_id:
         lines.append(localize("history.date", date=date_str))
         lines.append("")
 
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-    from aiogram.types import InlineKeyboardButton
     kb = InlineKeyboardBuilder()
     nav_buttons = []
     if page > 0:

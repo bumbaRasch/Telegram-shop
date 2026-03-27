@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone, time as dt_time
 
 from sqlalchemy import delete, select, func
+from bot.constants import PAYMENT_STATUS_PENDING, PAYMENT_STATUS_FAILED
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class CleanupManager:
                     # 2. Delete old pending/failed payments
                     payments_result = await s.execute(
                         delete(Payments).where(
-                            Payments.status.in_(['pending', 'failed']),
+                            Payments.status.in_([PAYMENT_STATUS_PENDING, PAYMENT_STATUS_FAILED]),
                             Payments.created_at < payments_cutoff
                         )
                     )

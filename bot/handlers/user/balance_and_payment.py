@@ -22,10 +22,12 @@ from bot.filters import ValidAmountFilter
 from bot.i18n import localize
 from bot.states import BalanceStates
 from bot.handlers.user._helpers import edit_msg
+from bot.keyboards.inline import simple_buttons
+from bot.constants import ACCEPTED_CRYPTO_ASSETS, INVOICE_COOLDOWN_SECONDS
 
 router = Router()
 
-_INVOICE_COOLDOWN = 30.0  # seconds between invoice creation per user
+_INVOICE_COOLDOWN = INVOICE_COOLDOWN_SECONDS
 _invoice_last_time: dict[int, float] = {}
 
 
@@ -157,7 +159,7 @@ async def process_replenish_balance(call: CallbackQuery, state: FSMContext):
                     amount=float(amount_dec),
                     expires_in=ttl_seconds,
                     currency=payment_request.currency,
-                    accepted_assets="TON,USDT,BTC,ETH",
+                    accepted_assets=ACCEPTED_CRYPTO_ASSETS,
                     payload=str(call.from_user.id),
                 )
             except CryptoPayAPIError as e:
@@ -502,7 +504,6 @@ async def buy_item_callback_handler(call: CallbackQuery, state: FSMContext):
         safe_value = sanitize_html(purchase_data['value'])
         username = call.from_user.username or call.from_user.first_name
 
-        from bot.keyboards.inline import simple_buttons
         buttons = [
             (f"📦 {purchase_data['item_name']}", f"bought-item:{purchase_data['bought_id']}:back_to_item"),
             (localize("btn.back"), "back_to_item"),

@@ -12,6 +12,7 @@ from bot.misc import EnvKeys
 from bot.database.methods.read import invalidate_user_cache, invalidate_stats_cache, invalidate_item_cache
 from bot.database.methods.cache_utils import safe_create_task
 from bot.database.methods.audit import log_audit
+from bot.constants import PAYMENT_STATUS_SUCCEEDED
 
 
 async def buy_item_transaction(telegram_id: int, item_name: str, promo_code: str = None) -> tuple[bool, str, dict | None]:
@@ -208,10 +209,10 @@ async def process_payment_with_referral(
             )).scalars().first()
 
             if existing_payment:
-                if existing_payment.status == "succeeded":
+                if existing_payment.status == PAYMENT_STATUS_SUCCEEDED:
                     await s.rollback()
                     return False, "already_processed"
-                existing_payment.status = "succeeded"
+                existing_payment.status = PAYMENT_STATUS_SUCCEEDED
             else:
                 payment = Payments(
                     provider=provider,
@@ -219,7 +220,7 @@ async def process_payment_with_referral(
                     user_id=user_id,
                     amount=amount,
                     currency=EnvKeys.PAY_CURRENCY,
-                    status="succeeded"
+                    status=PAYMENT_STATUS_SUCCEEDED,
                 )
                 s.add(payment)
 

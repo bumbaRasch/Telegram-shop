@@ -22,9 +22,10 @@ class BroadcastStats:
 
     @property
     def success_rate(self) -> float:
-        if self.total == 0:
-            return 0
-        return (self.sent / self.total) * 100
+        reachable = self.total - self.blocked
+        if reachable == 0:
+            return 0.0
+        return (self.sent / reachable) * 100
 
     @property
     def duration(self) -> Optional[float]:
@@ -62,12 +63,14 @@ class BroadcastManager:
             text: str,
             reply_markup: Optional[InlineKeyboardMarkup] = None,
             parse_mode: str = "HTML"
-    ) -> bool:
+    ) -> str:
         """
-        Securely sending a message with error handling
+        Securely send a message with error handling.
 
         Returns:
-            True if sent successfully, False if failed
+            "sent"    — delivered successfully
+            "blocked" — user has blocked the bot
+            "failed"  — any other failure
         """
         for attempt in range(self.retry_count):
             try:
@@ -76,36 +79,32 @@ class BroadcastManager:
                     text=text,
                     reply_markup=reply_markup,
                     parse_mode=parse_mode,
-                    disable_notification=True # Don't spam notifications
+                    disable_notification=True,
                 )
-                return True
+                return "sent"
 
             except TelegramRetryAfter as e:
-                # Telegram asks to wait
                 if attempt < self.retry_count - 1:
                     await asyncio.sleep(e.retry_after)
                     continue
-                return False
+                return "failed"
 
             except TelegramForbiddenError:
-                # Bot blocked by user
                 logger.debug(f"Bot blocked by user {user_id}")
-                return False
+                return "blocked"
 
             except TelegramBadRequest as e:
-                # Invalid message parameters
                 logger.error(f"Bad request for user {user_id}: {e}")
-                return False
+                return "failed"
 
             except Exception as e:
-                # Unknown error
                 logger.error(f"Unknown error sending to {user_id}: {e}")
                 if attempt < self.retry_count - 1:
                     await asyncio.sleep(1)
                     continue
-                return False
+                return "failed"
 
-        return False
+        return "failed"
 
     async def broadcast(
             self,
@@ -157,11 +156,12 @@ class BroadcastManager:
 
             # Update the statistics
             for result in results:
-                if isinstance(result, Exception):
-                    stats.failed += 1
-                elif result:
+                if result == "sent":
                     stats.sent += 1
+                elif result == "blocked":
+                    stats.blocked += 1
                 else:
+                    # "failed" or unexpected exception
                     stats.failed += 1
 
             # Calling a progress collback
@@ -180,8 +180,6 @@ class BroadcastManager:
                 await asyncio.sleep(self.batch_delay)
 
         stats.end_time = datetime.now()
-        stats.blocked = stats.failed  # Estimate
-
         return stats
 
     def cancel(self):

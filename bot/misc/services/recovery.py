@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update, text
+from bot.constants import PAYMENT_STATUS_PENDING, PAYMENT_STATUS_FAILED
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class RecoveryManager:
                     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
                     result = await s.execute(
                         select(Payments).where(
-                            Payments.status == "pending",
+                            Payments.status == PAYMENT_STATUS_PENDING,
                             Payments.created_at < cutoff,
                             Payments.provider == "cryptopay"
                         )
@@ -139,7 +140,7 @@ class RecoveryManager:
 
         async with Database().session() as s:
             await s.execute(
-                update(Payments).where(Payments.id == payment_id).values(status="failed")
+                update(Payments).where(Payments.id == payment_id).values(status=PAYMENT_STATUS_FAILED)
             )
 
     async def periodic_health_check(self):

@@ -209,17 +209,12 @@ async def start_bot() -> None:
         debug=EnvKeys.DEBUG == "1"
     )
 
-    # Logging level setting
+    # Root-logger fallback for third-party libraries (sqlalchemy, uvicorn, etc.)
     log_level = logging.DEBUG if EnvKeys.DEBUG == "1" else logging.INFO
     logging.basicConfig(
         level=log_level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-
-    # Disconnect unnecessary logs from aiogram
-    logging.getLogger("aiogram.dispatcher").setLevel(logging.WARNING)
-    logging.getLogger("aiogram.event").setLevel(logging.WARNING)
-    logging.getLogger("aiogram.middlewares").setLevel(logging.WARNING)
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
     # Checking critical environment variables

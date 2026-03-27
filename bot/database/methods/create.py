@@ -1,13 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select, exists
+from sqlalchemy import select, exists, func as sa_func
 
 from bot.database.models import User, ItemValues, Goods, Categories, Operations, Payments, ReferralEarnings, Role
 from bot.database.models.main import PromoCodes, CartItems, Reviews
 from bot.database import Database
 from bot.database.methods.cache_utils import safe_create_task
 from bot.database.methods.read import invalidate_stats_cache
+from bot.constants import PAYMENT_STATUS_PENDING, CART_MAX_ITEMS
 
 
 async def create_user(
@@ -115,7 +116,7 @@ async def create_pending_payment(provider: str, external_id: str, user_id: int, 
             user_id=user_id,
             amount=Decimal(amount),
             currency=currency,
-            status="pending"
+            status=PAYMENT_STATUS_PENDING,
         ))
 
 
@@ -154,7 +155,6 @@ async def create_promo_code(
     item_id: int = None,
 ) -> int | None:
     """Create a promo code. Returns ID or None if code already exists."""
-    from decimal import Decimal
     async with Database().session() as s:
         result = await s.execute(select(exists().where(PromoCodes.code == code.upper())))
         if result.scalar():
@@ -175,8 +175,6 @@ async def create_promo_code(
 
 async def add_to_cart(user_id: int, item_name: str, promo_code: str = None) -> tuple[bool, str]:
     """Add item to user's cart. Returns (success, message)."""
-    from sqlalchemy import func as sa_func
-    CART_MAX_ITEMS = 10
     async with Database().session() as s:
         count = (await s.execute(
             select(sa_func.count(CartItems.id)).where(CartItems.user_id == user_id)

@@ -17,6 +17,7 @@ from bot.filters import HasPermissionFilter
 from bot.misc import BroadcastMessage, sanitize_html
 from bot.misc.services import BroadcastManager, BroadcastStats
 from bot.states import BroadcastFSM
+from bot.constants import BROADCAST_BATCH_SIZE, BROADCAST_BATCH_DELAY, BROADCAST_PROGRESS_THROTTLE
 
 router = Router()
 
@@ -65,7 +66,7 @@ async def broadcast_messages(message: Message, state: FSMContext):
 
         async def update_progress(stats: BroadcastStats):
             now = time.monotonic()
-            if now - _last_progress[0] < 2.0:
+            if now - _last_progress[0] < BROADCAST_PROGRESS_THROTTLE:
                 return
             _last_progress[0] = now
 
@@ -86,8 +87,8 @@ async def broadcast_messages(message: Message, state: FSMContext):
         # Start the mailing
         broadcast_manager = BroadcastManager(
             bot=message.bot,
-            batch_size=30,
-            batch_delay=1.0
+            batch_size=BROADCAST_BATCH_SIZE,
+            batch_delay=BROADCAST_BATCH_DELAY,
         )
 
         stats = await broadcast_manager.broadcast(
