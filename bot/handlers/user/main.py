@@ -84,11 +84,11 @@ async def start(message: Message, state: FSMContext):
     markup = main_menu(role=role_data, channel=channel_username, helper=EnvKeys.HELPER_ID, layout=layout)
     photo = get_photo(MENU_PHOTO_PATH)
     try:
-        sent = await message.answer_photo(photo, caption=localize("menu.title"), reply_markup=markup)
+        sent = await message.answer_photo(photo, caption=localize("menu.title"), reply_markup=markup, parse_mode='HTML')
         if sent.photo:
             cache_photo(MENU_PHOTO_PATH, sent.photo[-1].file_id)
     except Exception:
-        await message.answer(localize("menu.title"), reply_markup=markup)
+        await message.answer(localize("menu.title"), reply_markup=markup, parse_mode='HTML')
     await message.delete()
     await state.clear()
 

@@ -22,10 +22,10 @@ def cache_photo(path: str, file_id: str) -> None:
 # ── Message edit helpers ────────────────────────────────────────────────────
 
 async def edit_msg(message: Message, text: str, reply_markup=None,
-                   parse_mode: str = None) -> None:
+                   parse_mode: str = 'HTML') -> None:
     """
     Edit text or caption — whichever fits the message type.
-    Signature mirrors edit_text() so admin handlers can be patched with sed.
+    Defaults to HTML parse_mode because most i18n strings contain <b>/<s> tags.
     """
     try:
         if message.photo or message.video or message.animation:
@@ -40,7 +40,7 @@ async def edit_msg(message: Message, text: str, reply_markup=None,
 
 
 async def edit_media_msg(message: Message, photo_path: str, caption: str,
-                         reply_markup=None, parse_mode: str = None) -> None:
+                         reply_markup=None, parse_mode: str = 'HTML') -> None:
     """
     Swap the photo of a photo-message and update caption + keyboard at once.
     Caches the returned file_id so subsequent swaps avoid re-uploading.
