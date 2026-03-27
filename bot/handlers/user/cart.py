@@ -43,11 +43,13 @@ async def _show_cart(call: CallbackQuery):
     from bot.database.methods.read import get_item_info
     lines = [localize("cart.title"), ""]
     real_total = Decimal(0)
+    has_unavailable = False
 
     for item in items:
         info = await get_item_info(item['item_name'])
         if not info:
-            lines.append(localize("cart.item", name=item['item_name'], price='?', currency=EnvKeys.PAY_CURRENCY))
+            lines.append(localize("cart.unavailable_warning", name=item['item_name']))
+            has_unavailable = True
             continue
 
         price = Decimal(str(info['price']))
@@ -61,6 +63,8 @@ async def _show_cart(call: CallbackQuery):
             real_total += price
 
     lines.append(localize("cart.total", total=real_total, currency=EnvKeys.PAY_CURRENCY))
+    if has_unavailable:
+        lines.append("\n" + localize("cart.items_unavailable"))
 
     buttons = []
     for item in items:

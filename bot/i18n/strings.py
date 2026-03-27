@@ -452,6 +452,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cart.checkout_receipt": "✅ Заказ оформлен!\n➖➖➖➖➖➖➖➖➖➖➖➖\n📦 Кол-во: {count} шт.\n💲 Итого: {total} {currency}\n👤 Покупатель: @{username} ({user_id})\n🕐 Время: {datetime}\n➖➖➖➖➖➖➖➖➖➖➖➖\nНажмите на товар для просмотра:",
         "cart.checkout_fail": "❌ Не удалось оформить заказ: {reason}",
         "cart.items_unavailable": "Некоторые товары более недоступны и были убраны из корзины.",
+        "cart.promo_expired": "❌ Промокод истёк или больше недействителен. Оформите заказ заново.",
+        "cart.unavailable_warning": "⚠️ <b>{name}</b> — товар недоступен (будет удалён при оформлении)",
 
 
         # === Operation History ===
@@ -940,6 +942,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "cart.checkout_receipt": "✅ Order placed!\n➖➖➖➖➖➖➖➖➖➖➖➖\n📦 Qty: {count}\n💲 Total: {total} {currency}\n👤 Buyer: @{username} ({user_id})\n🕐 Time: {datetime}\n➖➖➖➖➖➖➖➖➖➖➖➖\nTap an item to view details:",
         "cart.checkout_fail": "❌ Checkout failed: {reason}",
         "cart.items_unavailable": "Some items are no longer available and were removed from cart.",
+        "cart.promo_expired": "❌ Promo code expired or is no longer valid. Please retry checkout.",
+        "cart.unavailable_warning": "⚠️ <b>{name}</b> — unavailable (will be removed at checkout)",
 
 
         # === Operation History ===
